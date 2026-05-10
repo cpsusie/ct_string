@@ -1,0 +1,479 @@
+# cstr_view
+
+A small, header-only C++20 library providing two complementary types built on
+`std::basic_string_view`:
+
+| Type | Header | What it is |
+|---|---|---|
+| `cjm::ct_string::basic_fixed_string<TChar, N>` | `<ct_str/fixed_string.hpp>` | A fixed-capacity, null-terminated character buffer that is usable as a non-type template parameter (NTTP). |
+| `cjm::ct_string::basic_ct_string_view<TChar, VALID_CSTR>` | `<ct_str/ct_string_view.hpp>` | A non-owning view that — when `VALID_CSTR == true` — is *statically known* to refer to a null-terminated, static-storage-duration character buffer. Safe to pass to C APIs. Cannot dangle. |
+
+If you have ever wanted to write something like
+
+```cpp
+constexpr auto sv = "hello"_ctsv;            // a string_view-like type
+const char*  cs   = sv.c_str();               // ...that ALSO has c_str()
+                                              //    and CANNOT dangle.
+```
+
+…this library is for you.
+
+---
+
+## Table of contents
+
+- [Why not just `std::string_view`?](#why-not-just-stdstring_view)
+- [The two types at a glance](#the-two-types-at-a-glance)
+- [Quick start](#quick-start)
+- [Use case 1: `c_str()` without copying or allocating](#use-case-1-c_str-without-copying-or-allocating)
+- [Use case 2: views that cannot dangle](#use-case-2-views-that-cannot-dangle)
+- [Use case 3: a string as a non-type template parameter](#use-case-3-a-string-as-a-non-type-template-parameter)
+- [Use case 4: heterogeneous lookup in maps & sets](#use-case-4-heterogeneous-lookup-in-maps--sets)
+- [Use case 5: formatting](#use-case-5-formatting)
+- [The two flavors of `basic_ct_string_view`](#the-two-flavors-of-basic_ct_string_view)
+- [Comparison cheat-sheet](#comparison-cheat-sheet)
+- [Building & integrating](#building--integrating)
+- [Requirements](#requirements)
+- [License](#license)
+
+---
+
+## Why not just `std::string_view`?
+
+`std::string_view` is excellent for read-only string parameters but has two
+properties that bite in production code:
+
+1. **It does not promise null-termination.** A `std::string_view` may be a
+   slice of a larger string. If you need a `const char*` to pass to a C API
+   (POSIX, Win32, OpenSSL, SQLite, libcurl, `fopen`, …) you cannot get one
+   from a `string_view` — you must copy into a `std::string` first.
+
+2. **It can dangle.** Nothing in the type stops you from constructing one
+   from a temporary `std::string` and outliving it. Some such cases are
+   diagnosed; many are not.
+
+`basic_ct_string_view` addresses both:
+
+1. The `VALID_CSTR == true` (a.k.a. **`known_cstr`**) flavor exposes
+   `c_str()` returning a real, guaranteed-null-terminated `const TChar*`.
+   No copy, no allocation, no `strlen`.
+
+2. Every `basic_ct_string_view` is constructible **only** from compile-time
+   data (a `basic_fixed_string` NTTP or its own factory) or from another
+   `basic_ct_string_view`. The pointed-to characters always have static
+   storage duration, so the view *cannot* dangle.
+
+`basic_fixed_string` is the storage type that backs all of this and has its
+own use case: as a literal you can pass as a template argument.
+
+---
+
+## The two types at a glance
+
+```cpp
+#include <ct_str/ct_string_view.hpp>
+
+using namespace cjm::ct_string;            // basic_fixed_string, basic_ct_string_view, ...
+using namespace cjm::ct_string::literals;  // _fs, _ctsv
+
+constexpr auto fs   = "hello"_fs;       // basic_fixed_string<char, 6>
+constexpr auto ctsv = "hello"_ctsv;     // basic_ct_string_view<char, true> == ct_cstring_view
+
+static_assert(fs.size()    == 5);
+static_assert(ctsv.size()  == 5);
+static_assert(ctsv.known_cstr);
+static_assert(ctsv == fs);              // also == "hello", == std::string_view{"hello"}, ...
+```
+
+Convenience aliases:
+
+| Alias | = |
+|---|---|
+| `ct_cstring_view`  | `basic_ct_string_view<char,    true>`  (has `c_str()`) |
+| `ct_string_view`   | `basic_ct_string_view<char,    false>` (`string_view`-shaped, no `c_str()`) |
+| `ct_wcstring_view` | `basic_ct_string_view<wchar_t, true>`  |
+| `ct_wstring_view`  | `basic_ct_string_view<wchar_t, false>` |
+| `ct_u8cstring_view` / `ct_u8string_view`   | `char8_t`  variants |
+| `ct_u16cstring_view` / `ct_u16string_view` | `char16_t` variants |
+| `ct_u32cstring_view` / `ct_u32string_view` | `char32_t` variants |
+
+---
+
+## Quick start
+
+```cpp
+#include <ct_str/ct_string_view.hpp>
+#include <cstdio>
+
+using namespace cjm::ct_string::literals;
+
+void greet(cjm::ct_string::ct_cstring_view name) {
+    // c_str() is guaranteed valid: zero-copy, null-terminated, no allocation.
+    std::printf("Hello, %s!\n", name.c_str());
+}
+
+int main() {
+    greet("world"_ctsv);                 // OK: literal -> compile-time NTTP storage
+    constexpr auto n = "Alice"_ctsv;
+    greet(n);                            // OK
+}
+```
+
+---
+
+## Use case 1: `c_str()` without copying or allocating
+
+Anywhere you currently see this pattern:
+
+```cpp
+void log(std::string_view msg) {
+    std::string copy{msg};               // allocate, just to get a c_str()
+    ::syslog(LOG_INFO, "%s", copy.c_str());
+}
+```
+
+…you can replace it with this when the caller can supply a compile-time
+string:
+
+```cpp
+void log(cjm::ct_string::ct_cstring_view msg) {
+    ::syslog(LOG_INFO, "%s", msg.c_str()); // no allocation
+}
+```
+
+`c_str()` only exists on the `known_cstr == true` flavor, so the type
+system will *prevent* you from accidentally calling it on a view that may
+not be null-terminated.
+
+---
+
+## Use case 2: views that cannot dangle
+
+```cpp
+auto bad() -> std::string_view {
+    std::string s = "hello";
+    return s;                  // dangling: s dies on return. UB at the call site.
+}
+
+auto good() -> cjm::ct_string::ct_cstring_view {
+    using namespace cjm::ct_string::literals;
+    return "hello"_ctsv;       // OK: backing storage is a static-duration NTTP
+}
+```
+
+`basic_ct_string_view`'s only public constructors are:
+
+- the same-type / cross-flavor copy/move constructors,
+- a `consteval` factory path (`_ctsv`, `make_ctsv`, `basic_ct_sv_factory`)
+  that takes a `basic_fixed_string` NTTP — whose buffer is by definition a
+  static-duration object.
+
+There is **no** public constructor from a runtime `const char*`, a
+`std::string&`, or a `std::string_view`. That eliminates the most common
+sources of dangling views.
+
+(The library opts the type into `std::ranges::enable_borrowed_range`, so
+even rvalue-returning expressions like `std::ranges::find("x"_ctsv, 'y')`
+do not yield `std::ranges::dangling`.)
+
+---
+
+## Use case 3: a string as a non-type template parameter
+
+`basic_fixed_string` satisfies the structural-type rules and works directly
+as a non-type template parameter. This is the most powerful use of the
+library.
+
+### Tagging a type with a compile-time name
+
+```cpp
+#include <ct_str/fixed_string.hpp>
+#include <iostream>
+
+using cjm::ct_string::basic_fixed_string;
+
+template<basic_fixed_string Name, typename T>
+struct named {
+    T value;
+
+    void print() const {
+        std::cout << Name.get_std_sv() << " = " << value << '\n';
+    }
+};
+
+int main() {
+    named<"width",  int>    w{1920};
+    named<"height", int>    h{1080};
+    named<"label", const char*> l{"hello"};
+    w.print();   // width = 1920
+    h.print();   // height = 1080
+    l.print();   // label = hello
+}
+```
+
+Notice the literal `"width"` appearing as a *template argument*: the array
+is implicitly converted to a `basic_fixed_string<char, 6>` via its
+`consteval` constructor and the class template's deduction guide.
+
+### Compile-time-validated string operations
+
+Because the value is part of the type, anything you compute from it can be
+checked at compile time:
+
+```cpp
+template<basic_fixed_string Path>
+struct route {
+    static_assert(Path.size() > 0,                          "route must be non-empty");
+    static_assert(Path.front() == '/',                      "route must start with '/'");
+    static_assert(std::ranges::find(Path, ' ') == Path.end(),
+                  "route must not contain spaces");
+
+    static constexpr auto value = Path;
+};
+
+route<"/api/v1/users"> users;            // OK
+// route<"api/v1/users"> bad;            // compile error: route must start with '/'
+```
+
+### Concatenation as a `consteval` operation
+
+`operator+` on two `basic_fixed_string`s is `consteval` and produces a new
+`basic_fixed_string` whose length is the exact sum of the two operand
+lengths (sans null terminator):
+
+```cpp
+using namespace cjm::ct_string::literals;
+constexpr auto greeting = "hello"_fs + ", "_fs + "world"_fs; // "hello, world"
+static_assert(greeting == "hello, world");
+static_assert(greeting.valid_cstr());
+```
+
+You can use the result of concatenation as another NTTP, allowing
+generic programming over compile-time-built strings.
+
+### Bridging `basic_fixed_string` (NTTP) and `basic_ct_string_view` (view)
+
+```cpp
+template<basic_fixed_string Greeting>
+auto get_greeting() {
+    return cjm::ct_string::make_ctsv<Greeting>();   // ct_cstring_view
+}
+
+constexpr auto g = get_greeting<"hi there">();
+static_assert(g == "hi there");
+const char* p = g.c_str();   // points into a static-storage NTTP buffer
+```
+
+`make_ctsv<...>()` (and the `_ctsv` literal) materialize a
+`ct_cstring_view` whose `data()` aims into the static-duration NTTP buffer
+held by `basic_ct_sv_factory<...>::fstr_val`. The buffer outlives the
+program, so the view can be freely copied, returned, stored, and passed to
+C APIs.
+
+---
+
+## Use case 4: heterogeneous lookup in maps & sets
+
+Both flavors of `basic_ct_string_view` ship with:
+
+- a transparent `std::hash` specialization,
+- transparent `operator==` / `operator<=>` overloads against any type
+  nothrow-convertible to the corresponding `std::basic_string_view`
+  (covers `std::basic_string`, `std::basic_string_view`, the opposite
+  flavor of view, and `basic_fixed_string` of the same character type).
+
+The library exposes pre-wired container aliases that engage C++20
+heterogeneous lookup without any user-side template gymnastics:
+
+```cpp
+#include <ct_str/ct_string_view.hpp>
+#include <string>
+#include <string_view>
+
+using namespace cjm::ct_string;
+using namespace cjm::ct_string::literals;
+
+ct_cstring_view_unordered_set s;           // unordered_set<ct_cstring_view, hash, equal_to<>>
+s.insert("hello"_ctsv);
+s.insert("world"_ctsv);
+
+bool a = s.contains(std::string_view{"hello"});  // heterogeneous, no temporary view
+bool b = s.contains(std::string{"world"});       // heterogeneous, no temporary string
+auto fs = "hello"_fs;
+bool c = s.contains(fs);                         // heterogeneous against basic_fixed_string
+
+ct_cstring_view_map<int> m;                // map<ct_cstring_view, int, less<>>
+m.emplace("alpha"_ctsv, 1);
+auto it = m.find(std::string_view{"alpha"});     // heterogeneous
+```
+
+Available aliases (each has a `_set` / `_map<TValue>` / `_unordered_set` /
+`_unordered_map<TValue>` form, plus generic templates parameterised on
+`TChar` / `VALID_CSTR`):
+
+| Concrete alias | Container |
+|---|---|
+| `ct_cstring_view_set`  / `ct_string_view_set`  / `ct_wcstring_view_set`  / `ct_wstring_view_set`  | `std::set<..., std::less<>>` |
+| `ct_cstring_view_map<V>`  / `ct_string_view_map<V>`  / `ct_wcstring_view_map<V>`  / `ct_wstring_view_map<V>`  | `std::map<..., V, std::less<>>` |
+| `ct_cstring_view_unordered_set`  / `ct_string_view_unordered_set`  / `ct_wcstring_view_unordered_set`  / `ct_wstring_view_unordered_set`  | `std::unordered_set<..., std::hash<...>, std::equal_to<>>` |
+| `ct_cstring_view_unordered_map<V>` / `ct_string_view_unordered_map<V>` / `ct_wcstring_view_unordered_map<V>` / `ct_wstring_view_unordered_map<V>` | `std::unordered_map<..., V, std::hash<...>, std::equal_to<>>` |
+
+Why is this nontrivial? C++20 heterogeneous lookup in unordered containers
+requires both `Hash::is_transparent` *and* `KeyEqual::is_transparent`.
+The library's `std::hash` specialization is transparent; the aliases
+additionally pass `std::equal_to<>` (which is also transparent and works
+because of the comparison-operator templates on the view) so that the
+ergonomic call sites above just work. See the doc comments in
+`ct_string_view.hpp` for the rationale and caveats (notably that lookup
+keys must be nothrow-convertible to the corresponding
+`std::basic_string_view`, which excludes raw `const TChar*`).
+
+---
+
+## Use case 5: formatting
+
+The library provides `std::formatter` (and, when `<fmt/format.h>` is on the
+include path, `fmt::formatter`) specializations for `char` and `wchar_t`
+flavors of `basic_ct_string_view`. They inherit from the standard
+string-view formatter, so the full string-view format spec is supported:
+
+```cpp
+#include <ct_str/ct_string_view.hpp>
+#include <format>
+
+using namespace cjm::ct_string::literals;
+
+auto a = std::format("{}",       "hi"_ctsv);     // "hi"
+auto b = std::format("[{:>5}]",  "hi"_ctsv);     // "[   hi]"
+auto c = std::format("[{:*<5}]", "hi"_ctsv);     // "[hi***]"
+auto d = std::format("{:.3}",    "hello"_ctsv);  // "hel"
+auto w = std::format(L"{}",      cjm::ct_string::make_ctsv<L"wide">()); // L"wide"
+```
+
+If you also include `<fmt/format.h>` *before* `<ct_str/ct_string_view.hpp>`,
+`fmt::format(...)` works with the same syntax. The fmt support is
+auto-detected via `__has_include` and gated on the
+`CJM_CT_STRING_VIEW_HAS_FMT` macro defined by the header.
+
+---
+
+## The two flavors of `basic_ct_string_view`
+
+`basic_ct_string_view` is templated on a `bool VALID_CSTR` (exposed as the
+static `known_cstr` member), giving two distinct types:
+
+| Property | `known_cstr == true` (`ct_cstring_view`, …) | `known_cstr == false` (`ct_string_view`, …) |
+|---|---|---|
+| `c_str()` | available, returns a guaranteed-null-terminated pointer | not available (deleted by `requires`) |
+| `data()`  | available, == `c_str()` | available, no null-termination guarantee |
+| Default ctor | empty view pointing at static `'\0'` (`c_str()[0] == '\0'`) | empty view, `data()` unspecified |
+| `remove_prefix(n)` | OK (does not move the end pointer) | OK |
+| `remove_suffix(n)` | **disabled** (would invalidate null-termination) | OK |
+| `substr(pos)` (trailing) | returns same flavor (preserves guarantee) | returns same flavor |
+| `substr(pos, count)` (bounded) | returns the **non-`known_cstr`** flavor | returns the non-`known_cstr` flavor |
+| Implicit converting ctor from the other flavor | from non-`known_cstr` → `known_cstr` is **not provided** | from `known_cstr` → non-`known_cstr` **is** provided (downgrade is always safe) |
+
+This design lets the type system reflect the actual invariant: a view is
+either statically guaranteed to be a C-string (and you can call `c_str()`)
+or it is not (and you cannot, but you can still do anything else a
+`string_view` does, including the operations that would invalidate the
+guarantee).
+
+---
+
+## Comparison cheat-sheet
+
+```text
+                                 std::string_view   basic_ct_string_view
+                                                    (VALID_CSTR == true)
+─────────────────────────────────────────────────────────────────────────
+non-owning, contiguous, cheap        ✓                    ✓
+implicit conversion to std SV        —                    ✓ (noexcept)
+c_str() / null-termination promise   ✗                    ✓
+can dangle                           ✓                    ✗
+constructible from runtime ptr/string ✓                   ✗  (by design)
+usable as map/unordered_map key      ✓                    ✓ (with provided aliases)
+NTTP-friendly storage type           —                    basic_fixed_string
+
+                                 basic_fixed_string
+─────────────────────────────────────────────────────────────────────────
+fixed-capacity, owning buffer        ✓
+NTTP-eligible (structural type)      ✓
+constexpr concatenation (+)          ✓
+implicit conversion to std SV        ✓
+implicit conversion to std string    explicit (allocates)
+```
+
+---
+
+## Building & integrating
+
+The library is header-only.
+
+### CMake (FetchContent)
+
+```cmake
+include(FetchContent)
+FetchContent_Declare(
+    cstr_view
+    GIT_REPOSITORY https://github.com/<your-org>/cstr_view.git
+    GIT_TAG        main
+)
+FetchContent_MakeAvailable(cstr_view)
+
+target_link_libraries(my_target PRIVATE cstr_view)
+```
+
+### CMake (subdirectory)
+
+```cmake
+add_subdirectory(third_party/cstr_view)
+target_link_libraries(my_target PRIVATE cstr_view)
+```
+
+### Manual
+
+Add `inc/` to your include path and `#include <ct_str/ct_string_view.hpp>`
+(which includes `<ct_str/fixed_string.hpp>`).
+
+### Optional: `{fmt}` support
+
+If `<fmt/format.h>` is reachable from your include path *and* it is
+included before `<ct_str/ct_string_view.hpp>` (or the header detects it via
+`__has_include`), a `fmt::formatter` specialization for
+`basic_ct_string_view` is enabled automatically. No extra macro is
+required from the user.
+
+### Running the tests
+
+```bash
+cmake -S . -B build
+cmake --build build
+ctest --test-dir build --output-on-failure
+```
+
+GoogleTest is used and is located via `find_package(GTest CONFIG REQUIRED)`.
+
+---
+
+## Requirements
+
+- A C++20-conforming compiler with full support for:
+  - class types as non-type template parameters,
+  - concepts,
+  - `consteval`,
+  - three-way comparison.
+- Tested with MSVC (Visual Studio 2022 / cl 19.4x).
+- The optional `std::formatter` support requires `<format>`
+  (`__cpp_lib_format >= 201907L`).
+- The optional `contains` member uses the standard
+  `string_view::contains` (`__cpp_lib_string_contains >= 202011L`) when
+  available and falls back to a `find`-based implementation otherwise.
+
+---
+
+## License
+
+See [`LICENSE`](LICENSE) (add one if you have not already; the source files
+themselves do not currently embed a license header).
+

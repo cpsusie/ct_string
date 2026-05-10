@@ -1,0 +1,209 @@
+# =============================================================================
+# .gitignore for a CMake / CLion / Visual Studio / ReSharper C++ project
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# CMake
+# -----------------------------------------------------------------------------
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+CMakeUserPresets.json
+cmake_install.cmake
+install_manifest.txt
+CTestTestfile.cmake
+Testing/
+_deps/
+compile_commands.json
+CPackConfig.cmake
+CPackSourceConfig.cmake
+CMakeDoxyfile.in
+CMakeDoxygenDefaults.cmake
+
+# Common build directories
+build/
+build-*/
+out/
+bin/
+lib/
+
+# CLion / cmake-build-*
+cmake-build-*/
+
+# Ninja
+.ninja_deps
+.ninja_log
+build.ninja
+rules.ninja
+
+# -----------------------------------------------------------------------------
+# CLion / JetBrains IDEs
+# -----------------------------------------------------------------------------
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# JetBrains shelf and workspace caches
+.idea_modules/
+.idea/**/workspace.xml
+.idea/**/tasks.xml
+.idea/**/usage.statistics.xml
+.idea/**/dictionaries/
+.idea/**/shelf/
+.idea/**/contentModel.xml
+.idea/**/dataSources/
+.idea/**/dataSources.ids
+.idea/**/dataSources.local.xml
+.idea/**/sqlDataSources.xml
+.idea/**/dynamic.xml
+.idea/**/uiDesigner.xml
+.idea/**/dbnavigator.xml
+.idea/httpRequests/
+
+# -----------------------------------------------------------------------------
+# Visual Studio (incl. VS 2017+ "Open Folder" / CMake projects)
+# -----------------------------------------------------------------------------
+.vs/
+*.sln.docstates
+*.suo
+*.user
+*.userosscache
+*.sln.iml
+*.opensdf
+*.sdf
+*.VC.db
+*.VC.opendb
+*.aps
+*.ncb
+
+# Visual Studio cache for "Open Folder" CMake integration
+CMakeSettings.json
+.vs/CMakeWorkspaceSettings.json
+
+# Code analysis / IntelliCode
+*.pyproj.user
+*.bak
+*.tlog
+*.lastbuildstate
+*.unsuccessfulbuild
+*.metaproj
+*.metaproj.tmp
+*.binlog
+*.trx
+TestResults/
+
+# -----------------------------------------------------------------------------
+# ReSharper / ReSharper C++
+# -----------------------------------------------------------------------------
+_ReSharper*/
+*.[Rr]e[Ss]harper
+*.DotSettings.user
+*.DotCover
+
+# -----------------------------------------------------------------------------
+# Visual Studio Code (commonly used alongside CLion/VS)
+# -----------------------------------------------------------------------------
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/c_cpp_properties.json
+*.code-workspace
+
+# -----------------------------------------------------------------------------
+# Compiled / intermediate C/C++ artifacts
+# -----------------------------------------------------------------------------
+# Object files
+*.o
+*.obj
+*.lo
+*.slo
+*.ko
+
+# Precompiled headers
+*.gch
+*.pch
+
+# Linker output
+*.ilk
+*.map
+*.exp
+
+# Static / dynamic libraries
+*.a
+*.la
+*.lai
+*.lib
+*.so
+*.so.*
+*.dylib
+*.dll
+
+# Executables
+*.exe
+*.out
+*.app
+*.i*86
+*.x86_64
+*.hex
+
+# Debug / profile data
+*.pdb
+*.idb
+*.gcno
+*.gcda
+*.gcov
+*.coverage
+*.profraw
+*.profdata
+
+# Address/UB/MSan logs etc.
+*.asan
+*.tsan
+*.ubsan
+core
+core.*
+
+# -----------------------------------------------------------------------------
+# Package managers (vcpkg / Conan)
+# -----------------------------------------------------------------------------
+vcpkg_installed/
+.vcpkg-root
+conan.lock
+conanbuildinfo.*
+conaninfo.txt
+conan_toolchain.cmake
+graph_info.json
+
+# -----------------------------------------------------------------------------
+# OS junk
+# -----------------------------------------------------------------------------
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# -----------------------------------------------------------------------------
+# Editor backup / swap files
+# -----------------------------------------------------------------------------
+*.swp
+*.swo
+*.swn
+*.bak
+*.tmp
+*.orig
+
