@@ -474,6 +474,5 @@ GoogleTest is used and is located via `find_package(GTest CONFIG REQUIRED)`.
 
 ## License
 
-See [`LICENSE`](LICENSE) (add one if you have not already; the source files
-themselves do not currently embed a license header).
+See [`LICENSE`](LICENSE)
 
