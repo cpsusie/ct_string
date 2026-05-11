@@ -21,6 +21,9 @@ int main()
     static_assert(empty.valid_cstr());
     static_assert(empty.empty());
     static_assert(empty.size() == 0);
+    static_assert(empty.size() == empty.length());
+    static_assert(empty.buff_size() == 1);
+    static_assert(empty.buff_size() == empty.buff_length());
     static_assert(fixed.valid_cstr());
 
 
