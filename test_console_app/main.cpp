@@ -1,8 +1,28 @@
 #include <iostream>
 #include "../inc/ct_str/ct_string_view.hpp"
-
+#include "header_only_views.hpp"
+#include "impl_views.hpp"
+#include <cassert>
+#include <fmt/format.h>
 using cjm::ct_string::literals::operator ""_fs;
 using namespace std::literals;
+static constexpr auto newl = '\n';
+void demo_impl_views(std::ostream& os)
+{
+    using namespace cjm::ct_string::example_impl;
+    assert(g_k_padded_evangeline.known_cstr);
+    assert(g_k_padded_evangeline.c_str()[g_k_padded_evangeline.size()] == char{});
+    assert(g_k_evangeline.front() == 'T');
+    assert(g_k_evangeline.back() == '.');
+
+    std::cout << fmt::format("g_k_padded_evangeline: \n\"{}\"\n\n", g_k_padded_evangeline);
+    std::cout << fmt::format("g_k_evangeline: \n\"{}\"\n\n", g_k_evangeline);
+    std::cout << fmt::format("g_k_pre:  \n\"{}\"\n\n", g_k_pre);
+    std::cout << fmt::format( "g_k_post: \"{}\"\n\n", g_k_post);
+    std::cout << fmt::format( "g_k_forest: \"{}\"\n\n", g_k_forest);
+    std::cout << fmt::format( "g_k_voices: \"{}\"\n\n", g_k_voices);
+}
+
 int main()
 {
     constexpr auto expected = "This is the forest primaeval, the murmuring pines and the hemlocks,"sv;
@@ -21,6 +41,9 @@ int main()
     static_assert(empty.valid_cstr());
     static_assert(empty.empty());
     static_assert(empty.size() == 0);
+    static_assert(empty.size() == empty.length());
+    static_assert(empty.buff_size() == 1);
+    static_assert(empty.buff_size() == empty.buff_length());
     static_assert(fixed.valid_cstr());
 
 
@@ -42,6 +65,8 @@ int main()
         return 1;
     }
 
-    std::cout << "Hello, World!" << std::endl;
+    std::cout << "Hello, World!" << newl;
+
+    demo_impl_views(std::cout);
     return 0;
 }

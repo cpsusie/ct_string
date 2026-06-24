@@ -182,12 +182,18 @@ namespace cjm::ct_string
         /// \remarks Behavior is undefined if empty().
         [[nodiscard]] constexpr const_reference back() const noexcept { return m_str_v.back(); }
         /// \brief Pointer to the underlying character buffer.
-        /// \remarks Not guaranteed null-terminated unless known_cstr is true;
+        /// \remarks Not guaranteed to be non-null and not guaranteed to be null-terminated unless known_cstr is true:
         /// in that case prefer c_str() to make intent explicit.
         [[nodiscard]] constexpr const_pointer data() const noexcept { return m_str_v.data(); }
         /// \brief Pointer to a null-terminated C-string equivalent to this
         /// view. Participates in overload resolution only when known_cstr is
         /// true.
+        /// \remarks If this function participates in overload resolution, the following guarantees (in addition
+        /// to guarantee to be empty or otherwise to refer to a constexpr buffer of char_type of
+        /// static storage duration) are made:
+        /// 1- will not return nullptr
+        /// 2- the pointed-to string will always be null-terminated
+        /// 3- the pointed-to string will never have any null characters other than the terminator.
         [[nodiscard]] constexpr const_pointer c_str() const noexcept requires known_cstr { return m_str_v.data(); }
 
         // -- capacity --
@@ -418,6 +424,8 @@ namespace cjm::ct_string
         /// \brief Trivial destructor.
         ~basic_ct_string_view() noexcept = default;
 
+        //NOLINTBEGIN(*-explicit-constructor) (implicit conversion intended)
+        // ReSharper disable CppNonExplicitConvertingConstructor
         /// \brief Implicit converting constructor: a known_cstr view is always
         /// also a valid non-known_cstr view, so converting from the
         /// known_cstr flavor (OVALID_CSTR == true) into the non-known_cstr
@@ -426,13 +434,18 @@ namespace cjm::ct_string
         /// null-termination guarantee.
         template<bool OVALID_CSTR>
             requires (OVALID_CSTR && !known_cstr)
-        constexpr basic_ct_string_view(const basic_ct_string_view<char_type, OVALID_CSTR>& other) noexcept : m_str_v{other.m_str_v} {}
+
+        constexpr basic_ct_string_view(const basic_ct_string_view<char_type, OVALID_CSTR>& other) noexcept
+            : m_str_v{other.m_str_v} {}
+
         /// \brief Move-converting constructor; see the copy version for
         /// directionality requirements.
         template<bool OVALID_CSTR>
              requires (OVALID_CSTR && !known_cstr)
         constexpr basic_ct_string_view(basic_ct_string_view<char_type, OVALID_CSTR>&& other) noexcept
             : m_str_v{std::move(other.m_str_v)} {}
+        //NOLINTEND(*-explicit-constructor)
+        // ReSharper restore CppNonExplicitConvertingConstructor
 
         /// \brief Cross-flavor copy assignment from a known_cstr view into a
         /// non-known_cstr view. Same direction restriction as the converting
@@ -454,16 +467,22 @@ namespace cjm::ct_string
             return *this;
         }
 
+        // NOLINTBEGIN(*-explicit-constructor) implicit conversion to string_view intentional
         /// \brief Implicit nothrow conversion to the corresponding
         /// std::basic_string_view.
         [[nodiscard]] constexpr operator std_sv_type() const noexcept { return m_str_v; }
+        // NOLINTEND(*-explicit-constructor)
+
         /// \brief Explicit conversion to the corresponding std::basic_string
         /// (allocates).
-        explicit operator std_string_type() const noexcept { return std_string_type{to_string()}; }
-        /// \brief Allocating copy of the viewed range as a std::basic_string.
+        /// \throw std::bad_alloc or similar if memory cannot be allocated
+        explicit operator std_string_type() const noexcept { return std_string_type{m_str_v}; }
+        /// \brief Allocating copy of the viewed range as a std::basic_string. Synonym
+        /// for explicit conversion operator.
+        /// \throws std::bad_alloc or similar if memory cannot be allocated.
         [[nodiscard]] std_string_type to_string() const { return std_string_type{m_str_v}; }
 
-        // -- mutators (mutate the view, not the data) --
+        // -- mutators (mutate the view, *not* the data) --
         /// \brief Shrink the view from the front by \p n characters.
         /// \remarks Safe for both flavors: shrinking from the front keeps the
         /// same end pointer, so a known_cstr view stays null-terminated.
@@ -504,16 +523,11 @@ namespace cjm::ct_string
         /// \brief Equality with another view of the same exact type. Compared
         /// as string_views; null-terminator status is irrelevant to the
         /// result.
-        [[nodiscard]] constexpr bool operator==(const basic_ct_string_view& other) const noexcept
-        {
-            return m_str_v == other.m_str_v;
-        }
+        [[nodiscard]] constexpr bool operator==(const basic_ct_string_view& other) const noexcept = default;
+
         /// \brief Three-way comparison with another view of the same exact
         /// type. Yields the same ordering as the corresponding string_views.
-        [[nodiscard]] constexpr auto operator<=>(const basic_ct_string_view& other) const noexcept
-        {
-            return m_str_v <=> other.m_str_v;
-        }
+        [[nodiscard]] constexpr auto operator<=>(const basic_ct_string_view& other) const noexcept = default;
 
         // -- comparison: cross-flavor basic_ct_string_view --
         /// \brief Equality across the two flavors of basic_ct_string_view of
@@ -524,7 +538,8 @@ namespace cjm::ct_string
         {
             return m_str_v == other.m_str_v;
         }
-        /// \brief Three-way comparison across the two flavors.
+
+        /// \brief Three-way comparison across the two flavors of same character type.
         template<bool OVALID_CSTR>
             requires (OVALID_CSTR != VALID_CSTR)
         [[nodiscard]] constexpr auto operator<=>(const basic_ct_string_view<TChar, OVALID_CSTR>& other) const noexcept
@@ -532,7 +547,7 @@ namespace cjm::ct_string
             return m_str_v <=> other.m_str_v;
         }
 
-        // -- comparison: anything nothrow-convertible to std_sv_type (and not one of us) --
+        // -- comparison: anything nothrow-convertible to std_sv_type (and not a basic_ct_string_view) --
         /// \brief Equality with anything nothrow-convertible to std_sv_type
         /// (e.g. a basic_fixed_string of the same character type, a
         /// std::basic_string, a string literal). The other operand is first
@@ -546,7 +561,7 @@ namespace cjm::ct_string
         }
 
         /// \brief Three-way comparison with anything nothrow-convertible to
-        /// std_sv_type. See the equality version for conversion semantics.
+        /// std_sv_type (but not a basic_ct_string_view). See the equality version for conversion semantics.
         template<nothrow_convertible_to<std_sv_type> TOther>
             requires (!basic_ct_string_view_type<TOther>)
         [[nodiscard]] constexpr auto operator<=>(const TOther& other) const noexcept
