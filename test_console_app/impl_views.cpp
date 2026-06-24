@@ -29,8 +29,10 @@ namespace cjm::ct_string::example_impl
     return sv;
   }
 
-   constinit const ct_cstring_view g_k_padded_evangeline =
-      R"(     THIS is the forest primeval. The murmuring pines and the hemlocks,
+  // still compiles if skipping the constexpr variable, but the IDE hates it and gives errors, even though it compiles.
+  // so put in constexpr variable first, before assigning to the variables defined in header.
+
+  static constexpr auto g_k_prv_pd_ev = R"(     THIS is the forest primeval. The murmuring pines and the hemlocks,
   Bearded with moss, and in garments green, indistinct in the twilight,
   Stand like Druids of eld, with voices sad and prophetic,
   Stand like harpers hoar, with beards that rest on their bosoms.
@@ -52,7 +54,9 @@ namespace cjm::ct_string::example_impl
   List to the mournful tradition still sung by the pines of the forest;
   List to a Tale of Love in Acadie, home of the happy.       )"_ctsv;
 
-  constinit const ct_string_view g_k_evangeline = trim(g_k_padded_evangeline);
+  constinit const ct_cstring_view g_k_padded_evangeline = g_k_prv_pd_ev;
+
+  constinit const ct_string_view g_k_evangeline = trim(g_k_prv_pd_ev);
 
   constinit const ct_cstring_view g_k_pre = "pre"_ctsv;
   constinit const ct_cstring_view g_k_post = "post"_ctsv;
@@ -62,5 +66,7 @@ namespace cjm::ct_string::example_impl
   static_assert(g_k_padded_evangeline.known_cstr);
   static_assert(!g_k_evangeline.known_cstr);
   static_assert(has_c_str<decltype(g_k_padded_evangeline)>);
+
+  constinit const ct_cstring_view demo::s_k_author_name = "Christopher P. Susie"_ctsv;
 
 }

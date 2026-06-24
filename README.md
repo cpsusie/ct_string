@@ -10,7 +10,7 @@ A small, header-only C++20 library providing two complementary types built on
 
 If you have ever wanted to write something like
 
-```cpp
+```c++
 constexpr auto sv = "hello"_ctsv;            // a string_view-like type
 const char*  cs   = sv.c_str();               // ...that ALSO has c_str()
                                               //    and CANNOT dangle.
@@ -70,7 +70,7 @@ own use case: as a literal you can pass as a template argument.
 
 ## The two types at a glance
 
-```cpp
+```c++
 #include <ct_str/ct_string_view.hpp>
 
 using namespace cjm::ct_string;            // basic_fixed_string, basic_ct_string_view, ...
@@ -101,7 +101,7 @@ Convenience aliases:
 
 ## Quick start
 
-```cpp
+```c++
 #include <ct_str/ct_string_view.hpp>
 #include <cstdio>
 
@@ -125,7 +125,7 @@ int main() {
 
 Anywhere you currently see this pattern:
 
-```cpp
+```c++
 void log(std::string_view msg) {
     std::string copy{msg};               // allocate, just to get a c_str()
     ::syslog(LOG_INFO, "%s", copy.c_str());
@@ -135,7 +135,7 @@ void log(std::string_view msg) {
 …you can replace it with this when the caller can supply a compile-time
 string:
 
-```cpp
+```c++
 void log(cjm::ct_string::ct_cstring_view msg) {
     ::syslog(LOG_INFO, "%s", msg.c_str()); // no allocation
 }
@@ -149,7 +149,7 @@ not be null-terminated.
 
 ## Use case 2: views that cannot dangle
 
-```cpp
+```c++
 auto bad() -> std::string_view {
     std::string s = "hello";
     return s;                  // dangling: s dies on return. UB at the call site.
@@ -186,7 +186,7 @@ library.
 
 ### Tagging a type with a compile-time name
 
-```cpp
+```c++
 #include <ct_str/fixed_string.hpp>
 #include <iostream>
 
@@ -220,7 +220,7 @@ is implicitly converted to a `basic_fixed_string<char, 6>` via its
 Because the value is part of the type, anything you compute from it can be
 checked at compile time:
 
-```cpp
+```c++
 template<basic_fixed_string Path>
 struct route {
     static_assert(Path.size() > 0,                          "route must be non-empty");
@@ -241,7 +241,7 @@ route<"/api/v1/users"> users;            // OK
 `basic_fixed_string` whose length is the exact sum of the two operand
 lengths (sans null terminator):
 
-```cpp
+```c++
 using namespace cjm::ct_string::literals;
 constexpr auto greeting = "hello"_fs + ", "_fs + "world"_fs; // "hello, world"
 static_assert(greeting == "hello, world");
@@ -253,7 +253,7 @@ generic programming over compile-time-built strings.
 
 ### Bridging `basic_fixed_string` (NTTP) and `basic_ct_string_view` (view)
 
-```cpp
+```c++
 template<basic_fixed_string Greeting>
 auto get_greeting() {
     return cjm::ct_string::make_ctsv<Greeting>();   // ct_cstring_view
@@ -285,7 +285,7 @@ Both flavors of `basic_ct_string_view` ship with:
 The library exposes pre-wired container aliases that engage C++20
 heterogeneous lookup without any user-side template gymnastics:
 
-```cpp
+```c++
 #include <ct_str/ct_string_view.hpp>
 #include <string>
 #include <string_view>
@@ -337,7 +337,7 @@ include path, `fmt::formatter`) specializations for `char` and `wchar_t`
 flavors of `basic_ct_string_view`. They inherit from the standard
 string-view formatter, so the full string-view format spec is supported:
 
-```cpp
+```c++
 #include <ct_str/ct_string_view.hpp>
 #include <format>
 
@@ -378,6 +378,238 @@ either statically guaranteed to be a C-string (and you can call `c_str()`)
 or it is not (and you cannot, but you can still do anything else a
 `string_view` does, including the operations that would invalidate the
 guarantee).
+--
+## Usage Alternative 1: define as inline in header file as you would with a constexpr std::string_view
+
+These may defined inline in header files as you would do with std::string_view global constants.
+
+Pros: 
+    1. familiar
+    2. can use "auto"
+    3. can static assert on their value from anywhere that includes them
+    4. it is easy to see what their value is both by looking at header, and often in ide hints as well
+Cons:
+    1. there is greater instantiation cost for defining a ct_cstring_view than there is for defining a std::string_view
+
+If the number of instantiations is large in a widely included header and noticeable delay is added, 
+consider alternative 2.
+
+Example code:
+```c++
+#ifndef CSTR_VIEW_HEADER_ONLY_VIEWS_HPP
+#define CSTR_VIEW_HEADER_ONLY_VIEWS_HPP
+
+#include "ct_str/ct_string_view.hpp"
+#include <string_view>
+
+
+namespace cjm::ct_string::example_ho
+{
+    using namespace std::literals;
+    using namespace literals;
+
+    template<typename TCStrHaver>
+    concept has_c_str = requires (const TCStrHaver& x)
+    {
+        { x.c_str() } noexcept;
+    };
+
+
+    inline constexpr auto ascii_whitespace =  " \t\n\v\f\r"_ctsv;
+
+
+    constexpr ct_string_view trim(ct_string_view sv,
+                        ct_string_view chars = ascii_whitespace) noexcept
+    {
+        const auto first = sv.find_first_not_of(chars);
+
+        if (first == ct_string_view::npos)
+        {
+            return {};
+        }
+
+        const auto last = sv.find_last_not_of(chars);
+
+        sv.remove_prefix(first);
+        sv.remove_suffix(sv.size() - (last - first + 1));
+
+        return sv;
+    }
+// global definitions start here.....
+    inline constexpr auto g_k_padded_evangeline = // type: ct_cstring_view (null-terminated)
+R"(     THIS is the forest primeval. The murmuring pines and the hemlocks,
+  Bearded with moss, and in garments green, indistinct in the twilight,
+  Stand like Druids of eld, with voices sad and prophetic,
+  Stand like harpers hoar, with beards that rest on their bosoms.
+  Loud from its rocky caverns, the deep-voiced neighboring ocean
+  Speaks, and in accents disconsolate answers the wail of the forest.
+
+    This is the forest primeval; but where are the hearts that beneath it
+  Leaped like the roe, when he hears in the woodland the voice of the huntsman?
+  Where is the thatch-roofed village, the home of Acadian farmers,—
+  Men whose lives glided on like rivers that water the woodlands,
+  Darkened by shadows of earth, but reflecting an image of heaven?
+  Waste are those pleasant farms, and the farmers forever departed!
+  Scattered like dust and leaves, when the mighty blasts of October
+  Seize them, and whirl them aloft, and sprinkle them far o'er the ocean.
+  Naught but tradition remains of the beautiful village of Grand-Pré.
+
+    Ye who believe in affection that hopes, and endures, and is patient,
+  Ye who believe in the beauty and strength of woman's devotion,
+  List to the mournful tradition still sung by the pines of the forest;
+  List to a Tale of Love in Acadie, home of the happy.       )"_ctsv; 
+
+
+    // you can static assert on their value globally if this is done in a header
+    static_assert(g_k_padded_evangeline.known_cstr);
+    static_assert(char{} == g_k_padded_evangeline.c_str()[g_k_padded_evangeline.size()]);
+    static_assert(has_c_str<decltype(g_k_padded_evangeline)>);
+    
+    // note this is NOT a cstring because trimmed; NOT null-terminated
+    static constexpr auto g_k_evangeline = trim(g_k_padded_evangeline); //type: ct_string_view (no 'c' before 's') 
+    static_assert(!has_c_str<decltype(g_k_evangeline)>);
+    inline constexpr auto ev_front = g_k_evangeline.front();
+    static_assert(g_k_evangeline.back() == '.');
+
+    // inline assures linker will not complain about multiple definitions of these variables,
+    // since they are defined in a header file.  If a pointer or reference to them is taken,
+    // they will be consistent within a given process (unlike "static" keyword where the value will
+    // have a different address in every TU).
+    inline constexpr auto g_k_pre = "pre"_ctsv; //ct_cstring_view
+    inline constexpr auto g_k_post = "post"_ctsv; //ct_cstring_view
+    inline constexpr auto g_k_forest = "forest"_ctsv; //ct_cstring_view
+    inline constexpr auto g_k_voices = "voices"_ctsv; //ct_cstring_view
+
+}
+#endif //CSTR_VIEW_HEADER_ONLY_VIEWS_HPP
+```
+## Usage Alternative 2: declare in header, define in .cpp file with constinit.
+
+If you decide that a large, widely-included header file is slowing down compilation noticeably, you can declare the variables in the header but define them with constinit in the translation unit.  Note that constinit will only be applied in the definition, not in the header. Also, constinit does *NOT* imply const.  We want these to be global constants (presumably) so ensure they are marked const both at declaration and definition.  We are using constinit here not to have mutable values, but solely to allow definition to be segregated from declaration.
+
+In a project with a large number of protobufs included in headers, I suspect the difference in compilation time will be noise.  If a project is adopting effective techniques to minimize compile time, e.g. by heavy usage of PImpl, this may be the best option. Otherwise, just defining them in the header file should be the shortest path to success.
+
+Header file:
+```c++
+#ifndef CSTR_VIEW_IMPL_VIEWS_HPP
+#define CSTR_VIEW_IMPL_VIEWS_HPP
+#include "ct_str/ct_string_view.hpp"
+#include <string_view>
+
+namespace cjm::ct_string::example_impl
+{
+    using namespace std::literals;
+    using namespace literals;
+
+    //Example: global constants
+
+    //Note: unlike when putting definition in header, the value referred to by this
+    //ct_sv's is not static_assertable because they are not (in this context) manifestly constant
+    //expressions (their definition is invisible).
+    //You can still static_assert in .cpp file where defined, as long as definition is visible
+
+    // Since the definition cannot be seen, you cannot use "auto" in the header
+    // The opening text of evangeline with leading and trailing whitespace
+    extern const ct_cstring_view g_k_padded_evangeline;
+    // The opening text of evangeline with the whitespace trimmed.  Note,
+    // this is the only non-cstring view in this header
+    extern const ct_string_view g_k_evangeline; // Not a cstring: we know it will be result of trimming padded
+    // "pre"
+    extern const ct_cstring_view g_k_pre;
+    // "post"
+    extern const ct_cstring_view g_k_post;
+    // "forest"
+    extern const ct_cstring_view g_k_forest;
+    // "voices"
+    extern const ct_cstring_view g_k_voices;
+
+
+    //Example member static constants
+    struct demo
+    {
+        // "Christopher P. Susie"
+        static const ct_cstring_view s_k_author_name;
+    };
+
+}
+#endif //CSTR_VIEW_IMPL_VIEWS_HPP
+```
+
+Translation Unit:
+```c++
+#include "impl_views.hpp"
+
+namespace cjm::ct_string::example_impl
+{
+  template<typename TCStrHaver>
+  concept has_c_str = requires (const TCStrHaver& x)
+  {
+    { x.c_str() } noexcept;
+  };
+
+  static constexpr auto ascii_whitespace =  " \t\n\v\f\r"_ctsv;
+
+
+  static constexpr ct_string_view trim(ct_string_view sv,
+                      ct_string_view chars = ascii_whitespace) noexcept
+  {
+    const auto first = sv.find_first_not_of(chars);
+
+    if (first == ct_string_view::npos)
+    {
+      return {};
+    }
+
+    const auto last = sv.find_last_not_of(chars);
+
+    sv.remove_prefix(first);
+    sv.remove_suffix(sv.size() - (last - first + 1));
+
+    return sv;
+  }
+
+  // still compiles if skipping the constexpr variable, but the IDE hates it and gives errors, even though it compiles.
+  // so put in constexpr variable first, before assigning to the variables defined in header.
+
+  static constexpr auto g_k_prv_pd_ev = R"(     THIS is the forest primeval. The murmuring pines and the hemlocks,
+  Bearded with moss, and in garments green, indistinct in the twilight,
+  Stand like Druids of eld, with voices sad and prophetic,
+  Stand like harpers hoar, with beards that rest on their bosoms.
+  Loud from its rocky caverns, the deep-voiced neighboring ocean
+  Speaks, and in accents disconsolate answers the wail of the forest.
+
+    This is the forest primeval; but where are the hearts that beneath it
+  Leaped like the roe, when he hears in the woodland the voice of the huntsman?
+  Where is the thatch-roofed village, the home of Acadian farmers,—
+  Men whose lives glided on like rivers that water the woodlands,
+  Darkened by shadows of earth, but reflecting an image of heaven?
+  Waste are those pleasant farms, and the farmers forever departed!
+  Scattered like dust and leaves, when the mighty blasts of October
+  Seize them, and whirl them aloft, and sprinkle them far o'er the ocean.
+  Naught but tradition remains of the beautiful village of Grand-Pré.
+
+    Ye who believe in affection that hopes, and endures, and is patient,
+  Ye who believe in the beauty and strength of woman's devotion,
+  List to the mournful tradition still sung by the pines of the forest;
+  List to a Tale of Love in Acadie, home of the happy.       )"_ctsv;
+
+  constinit const ct_cstring_view g_k_padded_evangeline = g_k_prv_pd_ev;
+
+  constinit const ct_string_view g_k_evangeline = trim(g_k_prv_pd_ev);
+
+  constinit const ct_cstring_view g_k_pre = "pre"_ctsv;
+  constinit const ct_cstring_view g_k_post = "post"_ctsv;
+  constinit const ct_cstring_view g_k_forest = "forest"_ctsv;
+  constinit const ct_cstring_view g_k_voices = "voices"_ctsv;
+
+  static_assert(g_k_padded_evangeline.known_cstr);
+  static_assert(!g_k_evangeline.known_cstr);
+  static_assert(has_c_str<decltype(g_k_padded_evangeline)>);
+
+  constinit const ct_cstring_view demo::s_k_author_name = "Christopher P. Susie"_ctsv;
+
+}
+```
 
 ---
 

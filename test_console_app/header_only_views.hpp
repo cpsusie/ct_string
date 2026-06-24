@@ -37,7 +37,7 @@ namespace cjm::ct_string::example_ho
 
         return sv;
     }
-
+// global definitions start here.....
     inline constexpr auto g_k_padded_evangeline =
 R"(     THIS is the forest primeval. The murmuring pines and the hemlocks,
   Bearded with moss, and in garments green, indistinct in the twilight,
@@ -61,6 +61,8 @@ R"(     THIS is the forest primeval. The murmuring pines and the hemlocks,
   List to the mournful tradition still sung by the pines of the forest;
   List to a Tale of Love in Acadie, home of the happy.       )"_ctsv;
 
+
+    // you can static assert on their value globally if this is done in a header
     static_assert(g_k_padded_evangeline.known_cstr);
     static_assert(char{} == g_k_padded_evangeline.c_str()[g_k_padded_evangeline.size()]);
     static_assert(has_c_str<decltype(g_k_padded_evangeline)>);
@@ -70,10 +72,14 @@ R"(     THIS is the forest primeval. The murmuring pines and the hemlocks,
     inline constexpr auto ev_front = g_k_evangeline.front();
     static_assert(g_k_evangeline.back() == '.');
 
-    static constexpr auto g_k_pre = "pre"_ctsv;
-    static constexpr auto g_k_post = "post"_ctsv;
-    static constexpr auto g_k_forest = "forest"_ctsv;
-    static constexpr auto g_k_voices = "voices"_ctsv;
+    // inline assures linker will not complain about multiple definitions of these variables,
+    // since they are defined in a header file.  If a pointer or reference to them is taken,
+    // they will be consistent within a given process (unlike "static" keyword where the value will
+    // have a different address in every TU).
+    inline constexpr auto g_k_pre = "pre"_ctsv;
+    inline constexpr auto g_k_post = "post"_ctsv;
+    inline constexpr auto g_k_forest = "forest"_ctsv;
+    inline constexpr auto g_k_voices = "voices"_ctsv;
 
 }
 #endif //CSTR_VIEW_HEADER_ONLY_VIEWS_HPP
