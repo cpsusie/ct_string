@@ -463,7 +463,8 @@ GoogleTest is used and is located via `find_package(GTest CONFIG REQUIRED)`.
   - concepts,
   - `consteval`,
   - three-way comparison.
-- Tested with MSVC (Visual Studio 2022 / cl 19.4x).
+- Tested with MSVC (Visual Studio 2022 / cl 19.4x Windows 11, x86_64) and G++ (11.5 ubuntu x86_64, Linux).
+- Tested with and without `fmtlib`.
 - The optional `std::formatter` support requires `<format>`
   (`__cpp_lib_format >= 201907L`).
 - The optional `contains` member uses the standard
