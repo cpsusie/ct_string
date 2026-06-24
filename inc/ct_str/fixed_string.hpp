@@ -18,13 +18,19 @@ namespace cjm::ct_string
     /// \brief A concept describing one of the built-in character types:
     /// char, wchar_t, char8_t, char16_t and char32_t.
     template<typename TChar>
-    concept std_char = std::same_as<TChar, char> || std::same_as<TChar, wchar_t> || std::same_as<TChar, char8_t> || std::same_as<TChar, char16_t> || std::same_as<TChar, char32_t>;
+    concept std_char =
+        std::same_as<TChar, char>       ||
+        std::same_as<TChar, wchar_t>    ||
+        std::same_as<TChar, char8_t>    ||
+        std::same_as<TChar, char16_t>   ||
+        std::same_as<TChar, char32_t>;
 
     /// \brief forward declaration of basic_fixed_string
     template<std_char TChar, std::size_t CSTR_LEN>
         requires (CSTR_LEN > 0)
     struct basic_fixed_string;
 
+    /// \brief shorthand for std::remove_cv_t: removes top-level const and volatile
     template<typename T>
     using wo_cv_t = std::remove_cv_t<T>;
 
@@ -52,6 +58,8 @@ namespace cjm::ct_string
 
     /// \brief Requires that 1) TSre be std::convertible_to<TDst> and 2) that it be
     /// so-convertible without the possibility of throwing an exception
+    /// \remarks The standard does not require that const char* be nothrow convertible to std::string_view
+    /// but on clang, gcc, msvc they are.
     template<typename TSrc, typename TDst>
     concept nothrow_convertible_to = std::convertible_to<TSrc, TDst> &&
         detail::nothrow_convertible_to_IMPL<TSrc, TDst>;
@@ -73,8 +81,21 @@ namespace cjm::ct_string
     ///     2. serving as string type that works as a non-type template parameter
     /// \tparam TChar the character type of the basic_fixed_string.  It is constrained to be
     /// char, wchar_t, char8_t, char16_t or char32_t.
-    /// \tparam The length of the fixed size buffer.  This includes the null terminator.  Thus,
+    /// \tparam CSTR_LEN the length of the fixed size buffer.  This includes the null terminator.  Thus,
     /// it must always be > 0.
+    /// \remarks the static data member "m_str_arr" is public to meet the requirements of a type used as
+    /// a non-type-template parameter.  The constructors and literal operators for this type are available only at
+    /// compile-time and guarantee the following:
+    ///    1- string will be null-terminated AND
+    ///    2- string will not contain any null characters other than the terminator
+    /// Improvident direct mutation of m_str_arr may break these guarantees,
+    /// but the intended use of the type does not involve direct access to m_str_arr,
+    /// and the type's member functions will continue to work as long as the invariants are maintained.
+    /// When this type is used to construct a basic_ct_string_view, the invariants are checked again (compile-time-only)
+    /// and a basic_fixed_string with broken invariants will trigger compilation-error on conversion
+    /// \remarks the type's member functions (except buff_size() and buff_length()) do not treat the null-terminator
+    /// as being part of the string. You may access the null-terminator via the indexer operator [], but attempted
+    /// access to it via at() will throw std::out_of_range
     template<std_char TChar, std::size_t CSTR_LEN>
         requires (CSTR_LEN > 0)
     struct basic_fixed_string
@@ -93,7 +114,7 @@ namespace cjm::ct_string
         using pointer = std_sv_type::pointer;
         /// the constant pointer type
         using const_pointer = std_sv_type::const_pointer;
-        /// the reference type
+        /// the reference type (note: is const)
         using reference = std_sv_type::reference;
         /// the const reference type
         using const_reference = std_sv_type::const_reference;
@@ -126,7 +147,7 @@ namespace cjm::ct_string
 
         /// Gets constant iterator to first character
         [[nodiscard]] constexpr const_iterator begin() const noexcept { return get_std_sv().begin(); }
-        /// Gets constant iterator to one past the last character
+        /// Gets constant iterator to one past the last character (
         [[nodiscard]] constexpr const_iterator end() const noexcept { return get_std_sv().end(); }
         /// Gets constant iterator to first character
         [[nodiscard]] constexpr const_iterator cbegin() const noexcept { return get_std_sv().cbegin(); }
@@ -150,7 +171,8 @@ namespace cjm::ct_string
         /// \param[value] n index of desired character.
         /// \throws std::out_of_range if n >= size() (NOT buff_size)
         [[nodiscard]] constexpr const_reference at(size_type n) const { return m_str_arr.at(n); }
-        /// Get const pointer to front of buffer
+        /// Get const pointer to front of buffer.  Because buff_size() is always > 0, guaranteed
+        /// to be non-null.
         [[nodiscard]] constexpr const_pointer data() const noexcept { return m_str_arr.data(); }
         /// Get the std::basic_string_view corresponding to this type's char_type and traits type
         [[nodiscard]] constexpr std_sv_type get_std_sv() const noexcept
@@ -178,6 +200,7 @@ namespace cjm::ct_string
                 == get_std_sv().end();
         }
 
+        // NOLINTBEGIN(*-explicit-constructor) Implicit conversion necessary and intended
         // ReSharper disable once CppNonExplicitConvertingConstructor (implicitness intended)
         /// Construct a basic_fixed_string from a character literal.
         /// \param[in] str - character array to be copied in.
@@ -205,9 +228,11 @@ namespace cjm::ct_string
                 throw "Input string must be null-terminated, but cannot contain null characters."; // NOLINT(*-exception-baseclass)
             }
         }
+        // NOLINTEND(*-explicit-constructor)
 
-        /// Default ctor only works for an empty basic_fixed_string
-        consteval basic_fixed_string() requires (CSTR_LEN == 1)
+        /// Default ctor only works for an empty basic_fixed_string.  Buffer will contain null terminator,
+        /// string will be empty
+        consteval basic_fixed_string() noexcept requires (CSTR_LEN == 1)
         {
             m_str_arr.at(0) = char_type{};
         }
@@ -226,8 +251,14 @@ namespace cjm::ct_string
         /// Explicit conversion to appropriate std::basic_string
         constexpr explicit operator string_type() const { return string_type{m_str_arr.data(), CSTR_LEN -1}; }
         // ReSharper disable once CppNonExplicitConversionOperator
+
+        // NOLINTBEGIN(*-explicit-constructor) implicit conversion to std::basic_string_view intentional
         /// Implicit nothrow conversion to appropriate basic_string_view
+        /// \remarks if the fixed_string is a constant with static storage duration, the resultant
+        /// std::string_view will never dangle.  Otherwise, the returned std::basic_string_view
+        /// will be valid as long as the fixed_string remains alive and unmutated.
         constexpr operator std_sv_type() const noexcept { return get_std_sv(); }
+        // NOLINTEND(*-explicit-constructor)
 
         /// basic fixed string is equality comparable with another basic_fixed_string of the
         /// same type.  Equality is treated as string_view equality: the null-terminator
@@ -250,7 +281,8 @@ namespace cjm::ct_string
         /// a string_view: null terminator character is not considered
         template<std::size_t OCSTR_LEN>
             requires (OCSTR_LEN > 0 && OCSTR_LEN != CSTR_LEN)
-        constexpr bool operator==([[maybe_unused]] const basic_fixed_string<value_type, OCSTR_LEN>& other) const noexcept
+        constexpr bool operator==([[maybe_unused]] const basic_fixed_string<value_type, OCSTR_LEN>& other)
+            const noexcept
         {
             return get_std_sv() == other.get_std_sv();
         }
@@ -259,7 +291,8 @@ namespace cjm::ct_string
         /// The comparisons are made as if  a string_view: null terminator character is not considered
         template<std::size_t OCSTR_LEN>
             requires (OCSTR_LEN > 0 && OCSTR_LEN != CSTR_LEN)
-        constexpr std::strong_ordering operator<=>(const basic_fixed_string<value_type, OCSTR_LEN>& other) const noexcept
+        constexpr std::strong_ordering operator<=>(const basic_fixed_string<value_type, OCSTR_LEN>& other)
+            const noexcept
         {
             return get_std_sv() <=> other.get_std_sv();
         }
@@ -286,7 +319,7 @@ namespace cjm::ct_string
             return get_std_sv() <=> other_sv;
         }
 
-        /// basic_fixed_strings of the same character type are concatenatable.
+        /// basic_fixed_strings of the same character type can be concatenated.
         /// \param[in] other the string that should be appended to this one
         /// \returns a basic_fixed_string that is a valid_cstring containing the characters
         /// herein with the characters of other appended thereto.

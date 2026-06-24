@@ -605,7 +605,7 @@ TEST(CtStringView, CrossFlavorSpaceship)
 TEST(CtStringView, ConvertingConstructorCstrToNonCstr)
 {
     static constexpr auto cstr_sv = "hello"_ctsv;
-    static constexpr ct_string_view non_cstr{cstr_sv};
+    static constexpr ct_string_view non_cstr =cstr_sv;
     static_assert(non_cstr == "hello");
     EXPECT_EQ(non_cstr, "hello");
 }
@@ -613,7 +613,7 @@ TEST(CtStringView, ConvertingConstructorCstrToNonCstr)
 TEST(CtStringView, ConvertingAssignmentCstrToNonCstr)
 {
     static constexpr auto cstr_sv = "hello"_ctsv;
-    ct_string_view non_cstr;
+    ct_string_view non_cstr = "foo"_ctsv;
     non_cstr = cstr_sv;
     EXPECT_EQ(non_cstr, "hello");
     EXPECT_EQ(non_cstr.size(), 5u);
