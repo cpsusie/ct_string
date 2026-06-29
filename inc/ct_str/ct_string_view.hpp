@@ -25,11 +25,11 @@
 #if defined(__has_include)
 #  if __has_include(<fmt/format.h>)
 #    include <fmt/format.h>
-#    define CJM_CT_STRING_VIEW_HAS_FMT 1
+#    define CPS_CT_STRING_VIEW_HAS_FMT 1
 #  endif
 #endif
 
-namespace cjm::ct_string
+namespace cps::ct_string
 {
     /// \brief Forward declaration of basic_ct_string_view, the compile-time
     /// constructed string view type.
@@ -810,15 +810,15 @@ namespace cjm::ct_string
 /// a basic_ct_string_view's iterators remain valid even after the view itself
 /// is destroyed because they point at storage owned elsewhere (a
 /// basic_fixed_string NTTP or the static null_term_char).
-template<cjm::ct_string::std_char TChar, bool VALID_CSTR>
+template<cps::ct_string::std_char TChar, bool VALID_CSTR>
 inline constexpr bool std::ranges::enable_borrowed_range<
-    cjm::ct_string::basic_ct_string_view<TChar, VALID_CSTR>> = true;
+    cps::ct_string::basic_ct_string_view<TChar, VALID_CSTR>> = true;
 
 /// \brief Opt in to ranges::view, mirroring std::basic_string_view: copying a
 /// basic_ct_string_view is O(1) and does not copy the underlying characters.
-template<cjm::ct_string::std_char TChar, bool VALID_CSTR>
+template<cps::ct_string::std_char TChar, bool VALID_CSTR>
 inline constexpr bool std::ranges::enable_view<
-    cjm::ct_string::basic_ct_string_view<TChar, VALID_CSTR>> = true;
+    cps::ct_string::basic_ct_string_view<TChar, VALID_CSTR>> = true;
 
 /// \brief std::hash specialization for basic_ct_string_view. Delegates to
 /// std::hash<basic_string_view> so that a basic_ct_string_view, the
@@ -829,11 +829,11 @@ inline constexpr bool std::ranges::enable_view<
 /// member type signals that to the standard library).
 /// \remarks The const char_type* overload's behavior is undefined if its
 /// argument is null or not null-terminated.
-template<cjm::ct_string::std_char TChar, bool VALID_CSTR>
-struct std::hash<cjm::ct_string::basic_ct_string_view<TChar, VALID_CSTR>>
+template<cps::ct_string::std_char TChar, bool VALID_CSTR>
+struct std::hash<cps::ct_string::basic_ct_string_view<TChar, VALID_CSTR>>
 {
-    using argument_type = cjm::ct_string::basic_ct_string_view<TChar, VALID_CSTR>;
-    using other_argument_type = cjm::ct_string::basic_ct_string_view<TChar, !VALID_CSTR>;
+    using argument_type = cps::ct_string::basic_ct_string_view<TChar, VALID_CSTR>;
+    using other_argument_type = cps::ct_string::basic_ct_string_view<TChar, !VALID_CSTR>;
     using char_type = argument_type::char_type;
     using sv_type = argument_type::std_sv_type;
     using std_string_type = argument_type::std_string_type;
@@ -895,15 +895,15 @@ struct std::hash<cjm::ct_string::basic_ct_string_view<TChar, VALID_CSTR>>
 /// basic_ct_string_view convert implicitly to that string_view via the
 /// inherited (noexcept) conversion operator, so formatting is a zero-copy
 /// pass-through. Supports the full standard string-view format spec.
-template<cjm::ct_string::std_char TChar, bool VALID_CSTR>
+template<cps::ct_string::std_char TChar, bool VALID_CSTR>
     requires (std::same_as<TChar, char> || std::same_as<TChar, wchar_t>)
-struct std::formatter<cjm::ct_string::basic_ct_string_view<TChar, VALID_CSTR>, TChar>
+struct std::formatter<cps::ct_string::basic_ct_string_view<TChar, VALID_CSTR>, TChar>
     : std::formatter<std::basic_string_view<TChar>, TChar>
 {
     /// \brief Formats \p v by delegating to the inherited string_view
     /// formatter after an implicit conversion to std::basic_string_view.
     template<typename FormatContext>
-    auto format(const cjm::ct_string::basic_ct_string_view<TChar, VALID_CSTR>& v,
+    auto format(const cps::ct_string::basic_ct_string_view<TChar, VALID_CSTR>& v,
                 FormatContext& ctx) const
     {
         return std::formatter<std::basic_string_view<TChar>, TChar>::format(
@@ -926,22 +926,22 @@ struct std::formatter<cjm::ct_string::basic_ct_string_view<TChar, VALID_CSTR>, T
 // support is limited and version-dependent), so we again restrict to those
 // two character types.
 // ---------------------------------------------------------------------------
-#if defined(CJM_CT_STRING_VIEW_HAS_FMT)
+#if defined(CPS_CT_STRING_VIEW_HAS_FMT)
 
 /// \brief fmt::formatter specialization for basic_ct_string_view<TChar, ...>
 /// when TChar is char or wchar_t. Inherits the parse/format implementation
 /// from fmt::formatter<std::basic_string_view<TChar>, TChar>; basic_ct_string_view
 /// converts implicitly to std::basic_string_view, so this is a zero-copy
 /// pass-through. Supports the full {fmt} string-view format spec.
-template<cjm::ct_string::std_char TChar, bool VALID_CSTR>
+template<cps::ct_string::std_char TChar, bool VALID_CSTR>
     requires (std::same_as<TChar, char> || std::same_as<TChar, wchar_t>)
-struct fmt::formatter<cjm::ct_string::basic_ct_string_view<TChar, VALID_CSTR>, TChar>
+struct fmt::formatter<cps::ct_string::basic_ct_string_view<TChar, VALID_CSTR>, TChar>
     : fmt::formatter<std::basic_string_view<TChar>, TChar>
 {
     /// \brief Formats \p v by delegating to the inherited string_view
     /// formatter after an implicit conversion to std::basic_string_view.
     template<typename FormatContext>
-    auto format(const cjm::ct_string::basic_ct_string_view<TChar, VALID_CSTR>& v,
+    auto format(const cps::ct_string::basic_ct_string_view<TChar, VALID_CSTR>& v,
                 FormatContext& ctx) const
     {
         return fmt::formatter<std::basic_string_view<TChar>, TChar>::format(
@@ -949,7 +949,7 @@ struct fmt::formatter<cjm::ct_string::basic_ct_string_view<TChar, VALID_CSTR>, T
     }
 };
 
-#endif // CJM_CT_STRING_VIEW_HAS_FMT
+#endif // CPS_CT_STRING_VIEW_HAS_FMT
 
 #endif //CSTR_VIEW_CT_STRING_VIEW_HPP
 

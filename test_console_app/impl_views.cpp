@@ -1,6 +1,6 @@
 #include "impl_views.hpp"
 
-namespace cjm::ct_string::example_impl
+namespace cps::ct_string::example_impl
 {
   template<typename TCStrHaver>
   concept has_c_str = requires (const TCStrHaver& x)
