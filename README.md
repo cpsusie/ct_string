@@ -244,7 +244,7 @@ int main() {
 }
 ```
 
-Notice the literal `"width` appearing as a *template argument*: the array
+Notice the literal `"width"` appearing as a *template argument*: the array
 is implicitly converted to a `basic_fixed_string<char, 6>` via its
 `consteval` constructor and the class template's deduction guide.
 
