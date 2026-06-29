@@ -5,8 +5,8 @@ A small, header-only C++20 library providing two complementary types built on
 
 | Type | Header | What it is |
 |---|---|---|
-| `cjm::ct_string::basic_fixed_string<TChar, N>` | `<ct_str/fixed_string.hpp>` | A fixed-capacity, null-terminated character buffer that is usable as a non-type template parameter (NTTP). |
-| `cjm::ct_string::basic_ct_string_view<TChar, VALID_CSTR>` | `<ct_str/ct_string_view.hpp>` | A non-owning view that — when `VALID_CSTR == true` — is *statically known* to refer to a null-terminated, static-storage-duration character buffer. Safe to pass to C APIs. Cannot dangle. |
+| `cps::ct_string::basic_fixed_string<TChar, N>` | `<ct_str/fixed_string.hpp>` | A fixed-capacity, null-terminated character buffer that is usable as a non-type template parameter (NTTP). |
+| `cps::ct_string::basic_ct_string_view<TChar, VALID_CSTR>` | `<ct_str/ct_string_view.hpp>` | A non-owning view that — when `VALID_CSTR == true` — is *statically known* to refer to a null-terminated, static-storage-duration character buffer. Safe to pass to C APIs. Cannot dangle. |
 
 If you have ever wanted to write something like
 
@@ -31,6 +31,7 @@ const char*  cs   = sv.c_str();               // ...that ALSO has c_str()
 - [Use case 4: heterogeneous lookup in maps & sets](#use-case-4-heterogeneous-lookup-in-maps--sets)
 - [Use case 5: formatting](#use-case-5-formatting)
 - [The two flavors of `basic_ct_string_view`](#the-two-flavors-of-basic_ct_string_view)
+- [Defining Static-Member or Global Constants](#Defining-Static-Member-or-Global-Constants)
 - [Comparison cheat-sheet](#comparison-cheat-sheet)
 - [Building & integrating](#building--integrating)
 - [Requirements](#requirements)
@@ -73,8 +74,8 @@ own use case: as a literal you can pass as a template argument.
 ```c++
 #include <ct_str/ct_string_view.hpp>
 
-using namespace cjm::ct_string;            // basic_fixed_string, basic_ct_string_view, ...
-using namespace cjm::ct_string::literals;  // _fs, _ctsv
+using namespace cps::ct_string;            // basic_fixed_string, basic_ct_string_view, ...
+using namespace cps::ct_string::literals;  // _fs, _ctsv
 
 constexpr auto fs   = "hello"_fs;       // basic_fixed_string<char, 6>
 constexpr auto ctsv = "hello"_ctsv;     // basic_ct_string_view<char, true> == ct_cstring_view
@@ -105,9 +106,9 @@ Convenience aliases:
 #include <ct_str/ct_string_view.hpp>
 #include <cstdio>
 
-using namespace cjm::ct_string::literals;
+using namespace cps::ct_string::literals;
 
-void greet(cjm::ct_string::ct_cstring_view name) {
+void greet(cps::ct_string::ct_cstring_view name) {
     // c_str() is guaranteed valid: zero-copy, null-terminated, no allocation.
     std::printf("Hello, %s!\n", name.c_str());
 }
@@ -136,7 +137,7 @@ void log(std::string_view msg) {
 string:
 
 ```c++
-void log(cjm::ct_string::ct_cstring_view msg) {
+void log(cps::ct_string::ct_cstring_view msg) {
     ::syslog(LOG_INFO, "%s", msg.c_str()); // no allocation
 }
 ```
@@ -149,14 +150,16 @@ not be null-terminated.
 
 ## Use case 2: views that cannot dangle
 
+The `ct_cstring_view` and `ct_string_view` types document the fact that they cannot dangle; the way they are constructed guarantees it.  Only compile time constant strings with static storage duration can be bound to them.
+
 ```c++
 auto bad() -> std::string_view {
     std::string s = "hello";
     return s;                  // dangling: s dies on return. UB at the call site.
 }
 
-auto good() -> cjm::ct_string::ct_cstring_view {
-    using namespace cjm::ct_string::literals;
+auto good() -> cps::ct_string::ct_cstring_view {
+    using namespace cps::ct_string::literals;
     return "hello"_ctsv;       // OK: backing storage is a static-duration NTTP
 }
 ```
@@ -176,10 +179,40 @@ sources of dangling views.
 even rvalue-returning expressions like `std::ranges::find("x"_ctsv, 'y')`
 do not yield `std::ranges::dangling`.)
 
+**Why is this important?**  `std::string_view` is often used for three purposes:
+1. Storing string literals as a superior alternative to `const char*`
+  * without losing size information and
+  * gaining access to (read-only) std::library string interface 
+2. As function arguments where the actual type to which the string-view is unimportant
+3. Providing O(1) non-allocating substring operations (e.g. tokenizing) 
+With #1, the string literal referred to by the `const std::string_view` will never dangle.  For ##2-3, the `std::string_view`s used are subject to dangling to the same extent that a const std::string& is subject to outliving the object to which it was bound.  The `std::string_view` type, however, provides no such guarantees.  
+
+Imagine:
+
+```c++
+auto names_ids = std::map<std::string_view, int>
+{
+	{g_k_annabelle, 1}, 
+	{g_k_benjamin, 2}, 
+	{g_k_christina, 3}
+};
+
+// ...... stuff happens
+
+std::string david = "David";
+names_ids[david] = 4;	
+```
+
+We have a lookup above intented to store compile-time constants string literals as keys.  In some other context, however, someone decides to add a `std::string` to the map.  There will be no explicit cast required and no warning: `std::string` implicitly converts to `std::string_view`, by design.  Obviously, the result may not turn out well.
+[Godbolt Demo](https://godbolt.org/z/h8T3soWqW) 
+
+If instead of `std::string_view` as a key, the map had been `std::map<ct_cstring_view, int>` (if we care about null-termination) or `std::map<ct_string_view, int>` (if null-termination is irrelevant), we would have both:
+1. Documented our intent that the map is designed only to hold string literals and
+2. Enforced our intent at compile-time: no runtime checks necessary, code that attempts to add something non-conforming simply will not compile
+
 ---
 
 ## Use case 3: a string as a non-type template parameter
-
 `basic_fixed_string` satisfies the structural-type rules and works directly
 as a non-type template parameter. This is the most powerful use of the
 library.
@@ -190,7 +223,7 @@ library.
 #include <ct_str/fixed_string.hpp>
 #include <iostream>
 
-using cjm::ct_string::basic_fixed_string;
+using cps::ct_string::basic_fixed_string;
 
 template<basic_fixed_string Name, typename T>
 struct named {
@@ -211,7 +244,7 @@ int main() {
 }
 ```
 
-Notice the literal `"width"` appearing as a *template argument*: the array
+Notice the literal `"width` appearing as a *template argument*: the array
 is implicitly converted to a `basic_fixed_string<char, 6>` via its
 `consteval` constructor and the class template's deduction guide.
 
@@ -242,7 +275,7 @@ route<"/api/v1/users"> users;            // OK
 lengths (sans null terminator):
 
 ```c++
-using namespace cjm::ct_string::literals;
+using namespace cps::ct_string::literals;
 constexpr auto greeting = "hello"_fs + ", "_fs + "world"_fs; // "hello, world"
 static_assert(greeting == "hello, world");
 static_assert(greeting.valid_cstr());
@@ -256,7 +289,7 @@ generic programming over compile-time-built strings.
 ```c++
 template<basic_fixed_string Greeting>
 auto get_greeting() {
-    return cjm::ct_string::make_ctsv<Greeting>();   // ct_cstring_view
+    return cps::ct_string::make_ctsv<Greeting>();   // ct_cstring_view
 }
 
 constexpr auto g = get_greeting<"hi there">();
@@ -290,15 +323,14 @@ heterogeneous lookup without any user-side template gymnastics:
 #include <string>
 #include <string_view>
 
-using namespace cjm::ct_string;
-using namespace cjm::ct_string::literals;
+using namespace cps::ct_string;
+using namespace cps::ct_string::literals;
 
 ct_cstring_view_unordered_set s;           // unordered_set<ct_cstring_view, hash, equal_to<>>
 s.insert("hello"_ctsv);
 s.insert("world"_ctsv);
 
 bool a = s.contains(std::string_view{"hello"});  // heterogeneous, no temporary view
-bool b = s.contains(std::string{"world"});       // heterogeneous, no temporary string
 auto fs = "hello"_fs;
 bool c = s.contains(fs);                         // heterogeneous against basic_fixed_string
 
@@ -341,13 +373,13 @@ string-view formatter, so the full string-view format spec is supported:
 #include <ct_str/ct_string_view.hpp>
 #include <format>
 
-using namespace cjm::ct_string::literals;
+using namespace cps::ct_string::literals;
 
 auto a = std::format("{}",       "hi"_ctsv);     // "hi"
 auto b = std::format("[{:>5}]",  "hi"_ctsv);     // "[   hi]"
 auto c = std::format("[{:*<5}]", "hi"_ctsv);     // "[hi***]"
 auto d = std::format("{:.3}",    "hello"_ctsv);  // "hel"
-auto w = std::format(L"{}",      cjm::ct_string::make_ctsv<L"wide">()); // L"wide"
+auto w = std::format(L"{}",      cps::ct_string::make_ctsv<L"wide">()); // L"wide"
 ```
 
 If you also include `<fmt/format.h>` *before* `<ct_str/ct_string_view.hpp>`,
@@ -379,7 +411,9 @@ or it is not (and you cannot, but you can still do anything else a
 `string_view` does, including the operations that would invalidate the
 guarantee).
 --
-## Usage Alternative 1: define as inline in header file as you would with a constexpr std::string_view
+## Defining Static-Member or Global Constants
+
+### Usage Alternative 1: define as inline in header file as you would with a constexpr std::string_view
 
 These may defined inline in header files as you would do with std::string_view global constants.
 
@@ -403,7 +437,7 @@ Example code:
 #include <string_view>
 
 
-namespace cjm::ct_string::example_ho
+namespace cps::ct_string::example_ho
 {
     using namespace std::literals;
     using namespace literals;
@@ -483,9 +517,9 @@ R"(     THIS is the forest primeval. The murmuring pines and the hemlocks,
 }
 #endif //CSTR_VIEW_HEADER_ONLY_VIEWS_HPP
 ```
-## Usage Alternative 2: declare in header, define in .cpp file with constinit.
+### Usage Alternative 2: declare in header, define in .cpp file with constinit.
 
-If you decide that a large, widely-included header file is slowing down compilation noticeably, you can declare the variables in the header but define them with constinit in the translation unit.  Note that constinit will only be applied in the definition, not in the header. Also, constinit does *NOT* imply const.  We want these to be global constants (presumably) so ensure they are marked const both at declaration and definition.  We are using constinit here not to have mutable values, but solely to allow definition to be segregated from declaration.
+If you decide that a large, widely-included header file is slowing down compilation noticeably, you can declare the variables in the header but define them with constinit in the translation unit.  Note that constinit will only be applied in the definition, not in the header. Also, constinit does *NOT* imply const.  We want these to be global constants (presumably) so ensure they are marked const both at declaration and definition.  We are using constinit here **not** to have mutable views, but solely to segregate header declaration from translation unit definition. 
 
 In a project with a large number of protobufs included in headers, I suspect the difference in compilation time will be noise.  If a project is adopting effective techniques to minimize compile time, e.g. by heavy usage of PImpl, this may be the best option. Otherwise, just defining them in the header file should be the shortest path to success.
 
@@ -496,7 +530,7 @@ Header file:
 #include "ct_str/ct_string_view.hpp"
 #include <string_view>
 
-namespace cjm::ct_string::example_impl
+namespace cps::ct_string::example_impl
 {
     using namespace std::literals;
     using namespace literals;
@@ -539,7 +573,7 @@ Translation Unit:
 ```c++
 #include "impl_views.hpp"
 
-namespace cjm::ct_string::example_impl
+namespace cps::ct_string::example_impl
 {
   template<typename TCStrHaver>
   concept has_c_str = requires (const TCStrHaver& x)

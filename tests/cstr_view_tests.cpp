@@ -16,8 +16,8 @@
 #  include <format>
 #endif
 
-using namespace cjm::ct_string;
-using namespace cjm::ct_string::literals;
+using namespace cps::ct_string;
+using namespace cps::ct_string::literals;
 
 // ============================================================
 //  Concept / type-trait sanity checks

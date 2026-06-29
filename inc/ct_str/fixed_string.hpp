@@ -1,5 +1,5 @@
-#ifndef CJM_FIXED_STRING_HPP
-#define CJM_FIXED_STRING_HPP
+#ifndef CPS_FIXED_STRING_HPP
+#define CPS_FIXED_STRING_HPP
 #include <string>
 #include <string_view>
 #include <array>
@@ -13,7 +13,7 @@
 #include <concepts>
 #include <compare>
 
-namespace cjm::ct_string
+namespace cps::ct_string
 {
     /// \brief A concept describing one of the built-in character types:
     /// char, wchar_t, char8_t, char16_t and char32_t.

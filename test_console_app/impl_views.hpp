@@ -3,7 +3,7 @@
 #include "ct_str/ct_string_view.hpp"
 #include <string_view>
 
-namespace cjm::ct_string::example_impl
+namespace cps::ct_string::example_impl
 {
     using namespace std::literals;
     using namespace literals;

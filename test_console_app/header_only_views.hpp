@@ -5,7 +5,7 @@
 #include <string_view>
 
 
-namespace cjm::ct_string::example_ho
+namespace cps::ct_string::example_ho
 {
     using namespace std::literals;
     using namespace literals;
