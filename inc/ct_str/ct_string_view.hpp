@@ -570,6 +570,24 @@ namespace cps::ct_string
             return m_str_v <=> other_sv;
         }
 
+        /// \brief Stream insertion operator for basic_ct_string_view. Inserts
+        /// the underlying string_view into the stream, which applies the
+        /// stream's current width, fill and adjustfield settings exactly as
+        /// insertion of a std::basic_string_view would.
+        /// \param[in,out] os the output stream.
+        /// \param[in] sv the view to insert.
+        /// \returns the stream after insertion.
+        /// \remarks Found only via argument-dependent lookup. Participates in
+        /// overload resolution only when the stream's character and traits
+        /// types match this view's, and only when char_type is char or wchar_t,
+        /// because the standard library does not support stream insertions into
+        /// the utf character streams.
+        friend std_ostream_type& operator<<(std_ostream_type& os, basic_ct_string_view sv)
+            requires (std::same_as<char_type, char> || std::same_as<char_type, wchar_t>)
+        {
+            return os << sv.m_str_v;
+        }
+
     private:
         // Private tag-dispatched ctor used by substr to construct a view from
         // an already-validated std_sv_type without going through the
