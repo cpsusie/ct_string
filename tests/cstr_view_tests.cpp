@@ -5,6 +5,7 @@
 #include <set>
 #include <map>
 #include <sstream>
+#include <iomanip>
 #include <ranges>
 #include <iterator>
 #include <array>
@@ -323,7 +324,7 @@ TEST(BasicFixedString, StreamOutputNarrow)
     static constexpr auto fs = "hello"_fs;
     std::ostringstream oss;
     oss << fs;
-    EXPECT_EQ(oss.str(), "hello");
+    EXPECT_EQ(oss.view(), "hello");
 }
 
 TEST(BasicFixedString, StreamOutputWide)
@@ -331,7 +332,7 @@ TEST(BasicFixedString, StreamOutputWide)
     static constexpr basic_fixed_string fs{L"wide"};
     std::wostringstream oss;
     oss << fs;
-    EXPECT_EQ(oss.str(), L"wide");
+    EXPECT_EQ(oss.view(), L"wide");
 }
 
 // --- Other char types ---
@@ -926,6 +927,138 @@ TEST(CtStringView, UsableAsUnorderedMapKey)
     m[k2] = 2;
     EXPECT_EQ(m.at(k1), 1);
     EXPECT_EQ(m.at(k2), 2);
+}
+
+// --- operator<< ---
+
+namespace
+{
+    // Helper concept used by the viability checks below.
+    template<typename TStream, typename TView>
+    concept stream_insertable = requires(TStream& os, const TView& v) { os << v; };
+}
+
+// The inserter is viable for matching narrow/wide character types (including
+// streams derived from std::basic_ostream) but never across character types,
+// and never for the utf character types, which the standard library's stream
+// machinery does not support.
+static_assert(stream_insertable<std::ostringstream, ct_cstring_view>);
+static_assert(stream_insertable<std::ostringstream, ct_string_view>);
+static_assert(stream_insertable<std::ostream, ct_cstring_view>);
+static_assert(stream_insertable<std::wostringstream, ct_wcstring_view>);
+static_assert(stream_insertable<std::wostringstream, ct_wstring_view>);
+static_assert(!stream_insertable<std::ostringstream, ct_wcstring_view>);
+static_assert(!stream_insertable<std::wostringstream, ct_cstring_view>);
+static_assert(!stream_insertable<std::ostringstream, ct_u8cstring_view>);
+static_assert(!stream_insertable<std::ostringstream, ct_u16cstring_view>);
+static_assert(!stream_insertable<std::ostringstream, ct_u32cstring_view>);
+
+TEST(CtStringView, StreamOutputNarrow)
+{
+    static constexpr auto sv = "hello"_ctsv;
+    std::ostringstream oss;
+    oss << sv;
+    EXPECT_EQ(oss.view(), "hello");
+}
+
+TEST(CtStringView, StreamOutputWide)
+{
+    static constexpr auto wv = make_ctsv<L"wide">();
+    std::wostringstream oss;
+    oss << wv;
+    EXPECT_EQ(oss.view(), std::wstring{L"wide"});
+}
+
+TEST(CtStringView, StreamOutputEmpty)
+{
+    static constexpr ct_cstring_view sv{};
+    std::ostringstream oss;
+    oss << sv;
+    EXPECT_TRUE(oss.view().empty());
+    EXPECT_TRUE(oss.good());
+}
+
+TEST(CtStringView, StreamOutputNonCstrFlavor)
+{
+    static constexpr auto src = "hello world"_ctsv;
+    static constexpr auto part = src.substr(0, 5);  // ct_string_view
+    static_assert(std::is_same_v<std::remove_cvref_t<decltype(part)>, ct_string_view>);
+    std::ostringstream oss;
+    oss << part;
+    // Must honor size() rather than running on to the source buffer's terminator.
+    EXPECT_EQ(oss.view(), "hello");
+}
+
+TEST(CtStringView, StreamOutputAfterRemovePrefix)
+{
+    auto sv = "hello"_ctsv;
+    sv.remove_prefix(2);
+    std::ostringstream oss;
+    oss << sv;
+    EXPECT_EQ(oss.view(), "llo");
+}
+
+TEST(CtStringView, StreamOutputReturnsSameStream)
+{
+    static constexpr auto sv = "hello"_ctsv;
+    std::ostringstream oss;
+    auto& returned = (oss << sv);
+    EXPECT_EQ(&returned, &oss);
+    static_assert(std::is_same_v<decltype(oss << sv), std::ostream&>);
+}
+
+TEST(CtStringView, StreamOutputChains)
+{
+    static constexpr auto a = "hello"_ctsv;
+    static constexpr auto b = "world"_ctsv;
+    std::ostringstream oss;
+    oss << a << ' ' << b << '!';
+    EXPECT_EQ(oss.view(), "hello world!");
+}
+
+TEST(CtStringView, StreamOutputHonorsWidthAndFill)
+{
+    static constexpr auto sv = "hi"_ctsv;
+    std::ostringstream oss;
+    oss << std::setfill('*') << std::setw(5) << sv;
+    EXPECT_EQ(oss.view(), "***hi");
+}
+
+TEST(CtStringView, StreamOutputHonorsLeftAdjustment)
+{
+    static constexpr auto sv = "hi"_ctsv;
+    std::ostringstream oss;
+    oss << std::left << std::setfill('.') << std::setw(5) << sv;
+    EXPECT_EQ(oss.view(), "hi...");
+}
+
+TEST(CtStringView, StreamOutputConsumesWidthExactlyOnce)
+{
+    static constexpr auto sv = "hi"_ctsv;
+    std::ostringstream oss;
+    oss << std::setw(5) << sv << sv;
+    EXPECT_EQ(oss.view(), "   hihi");
+    EXPECT_EQ(oss.width(), 0);
+}
+
+TEST(CtStringView, StreamOutputMatchesStdStringViewInsertion)
+{
+    static constexpr auto sv = "hello"_ctsv;
+    std::ostringstream lhs;
+    std::ostringstream rhs;
+    lhs << std::setfill('-') << std::setw(9) << sv;
+    rhs << std::setfill('-') << std::setw(9) << static_cast<std::string_view>(sv);
+    EXPECT_EQ(lhs.view(), rhs.view());
+}
+
+TEST(CtStringView, StreamOutputWideNonCstrFlavor)
+{
+    static constexpr auto src = L"wide load"_ctsv;
+    static constexpr auto part = src.substr(0, 4);  // ct_wstring_view
+    static_assert(std::is_same_v<std::remove_cvref_t<decltype(part)>, ct_wstring_view>);
+    std::wostringstream oss;
+    oss << part;
+    EXPECT_EQ(oss.view(), std::wstring{L"wide"});
 }
 
 // --- Other char types ---
