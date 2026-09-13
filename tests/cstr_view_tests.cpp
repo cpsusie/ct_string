@@ -342,7 +342,7 @@ TEST(BasicFixedString, Char8Type)
     static constexpr basic_fixed_string fs{u8"utf8"};
     static_assert(std::is_same_v<decltype(fs)::char_type, char8_t>);
     static_assert(fs.size() == 4);
-    EXPECT_EQ(fs.get_std_sv(), std::u8string_view{u8"utf8"});
+    EXPECT_TRUE(fs.get_std_sv() == std::u8string_view{u8"utf8"});
 }
 
 TEST(BasicFixedString, Char16Type)
