@@ -325,7 +325,7 @@ namespace cps::ct_string
         /// herein with the characters of other appended thereto.
         template<std::size_t OCSTR_LEN>
                 requires (OCSTR_LEN > 0)
-        consteval auto operator+(const basic_fixed_string<value_type, OCSTR_LEN>& other) const noexcept
+        consteval auto operator+(const basic_fixed_string<value_type, OCSTR_LEN>& other) const
             -> concat_fixed_string_t<value_type, CSTR_LEN, OCSTR_LEN>
         {
             using ret_t = concat_fixed_string_t<value_type, CSTR_LEN, OCSTR_LEN>;
@@ -382,7 +382,7 @@ namespace cps::ct_string
         /// \remarks if somehow BFS is not null terminated or contains other null characters,
         /// the program will not compile.
         template<basic_fixed_string BFS>
-        consteval auto operator""_fs() noexcept
+        consteval auto operator""_fs()
         {
             if (!BFS.valid_cstr())
             {
