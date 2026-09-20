@@ -15,12 +15,12 @@ void demo_impl_views(std::ostream& os)
     assert(g_k_evangeline.front() == 'T');
     assert(g_k_evangeline.back() == '.');
 
-    std::cout << fmt::format("g_k_padded_evangeline: \n\"{}\"\n\n", g_k_padded_evangeline);
-    std::cout << fmt::format("g_k_evangeline: \n\"{}\"\n\n", g_k_evangeline);
-    std::cout << fmt::format("g_k_pre:  \n\"{}\"\n\n", g_k_pre);
-    std::cout << fmt::format( "g_k_post: \"{}\"\n\n", g_k_post);
-    std::cout << fmt::format( "g_k_forest: \"{}\"\n\n", g_k_forest);
-    std::cout << fmt::format( "g_k_voices: \"{}\"\n\n", g_k_voices);
+    os << fmt::format("g_k_padded_evangeline: \n\"{}\"\n\n", g_k_padded_evangeline);
+    os << fmt::format("g_k_evangeline: \n\"{}\"\n\n", g_k_evangeline);
+    os << fmt::format("g_k_pre:  \n\"{}\"\n\n", g_k_pre);
+    os << fmt::format( "g_k_post: \"{}\"\n\n", g_k_post);
+    os << fmt::format( "g_k_forest: \"{}\"\n\n", g_k_forest);
+    os << fmt::format( "g_k_voices: \"{}\"\n\n", g_k_voices);
 }
 
 int main()
