@@ -1,0 +1,168 @@
+//
+// Created by cpsusie on 9/13/26.
+//
+#ifndef HAND_EVALUATOR_CT_SV_MAP_H
+#define HAND_EVALUATOR_CT_SV_MAP_H
+#include "ct_str/ct_string_view.hpp"
+#include <unordered_map>
+
+namespace cps::hd_eval
+{
+    using ct_string::std_char;
+    using ct_string::ct_cstring_view;
+    using ct_string::ct_cstring_view;
+
+    namespace detail
+    {
+        template<std_char TChar,  typename TValue, bool IS_CSTR =true>
+        class unordered_bctsv_map_types
+        {
+        public:
+            using char_type = TChar;
+            using bctsv_type = ct_string::basic_ct_string_view<char_type, IS_CSTR>;
+            using std_uo_map_type = std::unordered_map<bctsv_type, TValue, std::hash<bctsv_type>, std::equal_to<>>;
+            using mapped_type = std::unordered_map<char_type, TValue>::mapped_type;
+
+        };
+
+        // TODO Move the case-insensitive ctsv comparison shit out of wherever it is, then put it here.
+        // TODO then re-enable this code below .. eventually I may decide to just commit this over to ctsv repo
+
+        // template<std_char TChar,  typename TValue, bool IS_CSTR =true>
+        // class ci_unordered_bctsv_map_types
+        // {
+        // public:
+        //     using char_type = TChar;
+        //     using bctsv_type = ct_string::basic_ct_string_view<char_type, IS_CSTR>;
+        //     using std_uo_map_type = std::unordered_map<bctsv_type, TValue, ci_hash<IS_CSTR>, ci_comp_eq<IS_CSTR>>;
+        //     using mapped_type = std::unordered_map<char_type, TValue>::mapped_type;
+        // };
+    }
+
+    template<std_char TChar, typename TValue, bool IS_CSTR>
+    using bctsv_t = detail::unordered_bctsv_map_types<TChar, TValue, IS_CSTR>::bctsv_type;
+
+    template<std_char TChar, typename TValue, bool IS_CSTR>
+    using std_uo_map_t = detail::unordered_bctsv_map_types<TChar, TValue, IS_CSTR>::std_uo_map_type;
+
+    template<std_char TChar,  typename TValue, bool IS_CSTR =true>
+    class unordered_bctsv_map : private std_uo_map_t<TChar, TValue, IS_CSTR>
+    {
+    public:
+        static constexpr bool is_cstring = IS_CSTR;
+        using char_type = TChar;
+        using base_type = std_uo_map_t<TChar, TValue, IS_CSTR>;
+        using bctsv_type = bctsv_t<TChar, TValue, IS_CSTR>;
+        using obctsv_type = bctsv_t<TChar, TValue, !IS_CSTR>;
+        using std_sv_type = bctsv_type::std_sv_type;
+        using base_type::value_type;
+        using base_type::size_type;
+        using key_type = base_type::key_type;
+        using mapped_type = base_type::mapped_type;
+        using iterator = base_type::iterator;
+        using const_iterator = base_type::const_iterator;
+        using reverse_iterator = base_type::reverse_iterator;
+        using const_reverse_iterator = base_type::const_reverse_iterator;
+        using base_type::base_type;
+        using reference = base_type::reference;
+        using const_reference = base_type::const_reference;
+        using pointer = base_type::pointer;
+        using const_pointer = base_type::const_pointer;
+
+        using base_type::empty;
+        using base_type::size;
+        using base_type::max_size;
+        using base_type::clear;
+        using base_type::begin;
+        using base_type::end;
+        using base_type::cbegin;
+        using base_type::cend;
+        using base_type::rbegin;
+        using base_type::rend;
+        using base_type::crbegin;
+        using base_type::crend;
+
+        using base_type::insert;
+        using base_type::erase;
+        using base_type::find;
+        using base_type::find_if;
+        using base_type::count;
+
+        using base_type::emplace;
+        using base_type::emplace_hint;
+        using base_type::try_emplace;
+        using base_type::insert_or_assign;
+        using base_type::merge;
+        using base_type::extract;
+        using base_type::swap;
+
+        auto operator[](bctsv_type key) -> mapped_type&
+        {
+            return base_type::operator[](key);
+        }
+
+        auto operator[](obctsv_type key) -> mapped_type&
+            requires std::constructible_from<key_type, obctsv_type>
+        {
+            return base_type::operator[](key);
+        }
+
+        auto at(std_sv_type key) const -> const mapped_type&
+        {
+            const auto it = base_type::find(key);
+            if (it != base_type::cend())
+            {
+                return it->second;
+            }
+            throw std::out_of_range{std::format("unordered_bctsv_map: key not found: {}", key)};
+        }
+
+        auto at(std_sv_type key) -> mapped_type&
+        {
+            const auto it = base_type::find(key);
+            if (it != base_type::end())
+            {
+                return it->second;
+            }
+            throw std::out_of_range{std::format("unordered_bctsv_map: key not found: {}", key)};
+        }
+
+        auto at_if(std_sv_type key) const noexcept(noexcept(base_type::find(key))) -> const mapped_type*
+        {
+            const auto it = base_type::find(key);
+            if (it != base_type::cend())
+            {
+                return std::addressof(it->second);
+            }
+            return nullptr;
+        }
+
+        auto at_if(std_sv_type key) noexcept(noexcept(base_type::find(key))) -> mapped_type*
+        {
+            const auto it = base_type::find(key);
+            if (it != base_type::end())
+            {
+                return std::addressof(it->second);
+            }
+            return nullptr;
+        }
+
+        base_type::const_iterator find(std_sv_type  key) const noexcept(noexcept(base_type::find(key)))
+        {
+            return base_type::find(key);
+        }
+
+        base_type::iterator find(std_sv_type key) noexcept(noexcept(base_type::find(key)))
+        {
+            return base_type::find(key);
+        }
+
+        [[nodiscard]] bool contains(std_sv_type key) const noexcept(noexcept(base_type::contains(key)))
+        {
+            return base_type::contains(key);
+        }
+    };
+}
+
+
+#endif //HAND_EVALUATOR_CT_SV_MAP_H
