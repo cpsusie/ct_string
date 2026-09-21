@@ -26,6 +26,10 @@
 #  if __has_include(<fmt/format.h>)
 #    include <fmt/format.h>
 #    define CPS_CT_STRING_VIEW_HAS_FMT 1
+#       if __has_include(<fmt/xchar.h>) && __has_include(<fmt/format.h>)
+#           include <fmt/xchar.h>
+#    define CPS_CT_STRING_VIEW_HAS_WFMT 1
+#       endif
 #  endif
 #endif
 
