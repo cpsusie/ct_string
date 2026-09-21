@@ -1,13 +1,21 @@
 #include <iostream>
 #include <chrono>
 #include <format>
+#include <utility>
+#include <memory>
+#include <atomic>
+#include <thread>
+#include <mutex>
+#include <ranges>
+#include <algorithm>
 #include "ct_str/ct_string_view.hpp"
 #include "header_only_views.hpp"
 #include "impl_views.hpp"
 #include <cassert>
+#include <random>
 #include <fmt/format.h>
 #include <fmt/xchar.h>
-#include <print>
+#include <fmt/ostream.h>
 #include "ct_str/ctsv_assoc_container.hpp"
 
 static constexpr auto newl = '\n';
@@ -107,6 +115,8 @@ struct fmt::formatter<TDerived>;
 namespace cps::ct_string::stream_per_format_test
 {
     void run_dog_test(std::ostream& os, std::ostream& err);
+
+    void run_doggy_kitty_test(std::ostream& os, std::ostream& err);
 
     class animal
     {
@@ -318,6 +328,10 @@ int main()
 
     std::cout << "Doggie test: " << newl;
     cps::ct_string::stream_per_format_test::run_dog_test(std::cout, std::cerr);
+
+    std::cout << newl << "Doggie Kitty test: " << newl;
+    cps::ct_string::stream_per_format_test::run_doggy_kitty_test(std::cout, std::cerr);
+
     return 0;
 }
 using namespace cps::ct_string::literals;
@@ -345,17 +359,20 @@ namespace cps::ct_string::stream_per_format_test
 
     private:
 
+        // ReSharper disable once CppOverrideWithDifferentVisibility
         void exec_write_self_details(std::ostream& os) const final
         {
             return fmt::print(os, "{}\t{}: [{:L}]",newl, fav_activity_label(),  get_activity_ct());
         }
 
 
+        // ReSharper disable once CppOverrideWithDifferentVisibility
         [[nodiscard]] std::string&& exec_name()&& noexcept final
         {
             return std::move(m_name);
         }
 
+        // ReSharper disable once CppOverrideWithDifferentVisibility
         [[nodiscard]] std::string_view exec_name() const& noexcept final
         {
             return m_name;
@@ -415,12 +432,68 @@ namespace cps::ct_string::stream_per_format_test
 
     };
 
+    class cat : public sensible_animal
+    {
+    public:
+
+        [[nodiscard]] int mice_eaten_last_month() const noexcept
+        {
+            return m_mice_caught;
+        }
+
+        ~cat() noexcept override = default;
+        cat(string_source auto&& name, years_t age, int num_mice = 0) noexcept(nothrow_string_source<decltype(name)>) :
+            sensible_animal{std::forward<decltype(name)>(name), age}, m_mice_caught{num_mice} {}
+        cat(const cat&) = default;
+        cat(cat&&) noexcept = default;
+        cat& operator=(const cat&) = default;
+        cat& operator=(cat&&) noexcept = default;
+    protected:
+
+        [[nodiscard]] int get_activity_ct() const noexcept final
+        {
+            return mice_eaten_last_month();
+        }
+
+        [[nodiscard]] ct_cstring_view fav_activity_label() const noexcept final
+        {
+            return "Number of Mice Caught Last Month"_ctsv;
+        }
+
+        std::string exec_n_make_animal_sound() override
+        {
+            if (++m_mice_caught < 12)
+            {
+                return "Meow... Hiss... Meow!"s;
+            }
+            return "Mieu! purrr.... purrr...... Meowzer!"s;
+        }
+        std::wstring exec_w_make_animal_sound() override
+        {
+            if (++m_mice_caught < 12)
+            {
+                return L"Meow... Hiss... Meow!"s;
+            }
+            return L"Mieu! purrr.... purrr...... Meowzer!"s;
+        }
+
+    private:
+
+        int m_mice_caught{0};
+    };
+
 
 }
 
 namespace cps::ct_string {
     template<>
-       inline constexpr bool g_k_stream_insert_via_fmt_format<stream_per_format_test::dog> = true;
+    inline constexpr bool g_k_stream_insert_via_fmt_format<stream_per_format_test::dog> = true;
+
+    template<>
+    inline constexpr bool g_k_stream_insert_via_fmt_format<stream_per_format_test::cat> = true;
+
+    template<>
+    inline constexpr bool g_k_stream_insert_via_fmt_format<stream_per_format_test::animal> = true;
 }
 
 namespace cps::ct_string::stream_per_format_test
@@ -433,6 +506,51 @@ namespace cps::ct_string::stream_per_format_test
         os << virgil << newl;
 
         err << "No messages like this, no error!" << newl;
+    }
+
+    void run_doggy_kitty_test(std::ostream& os, std::ostream& err)
+    {
+        using item_type = animal;
+        using p_item_type = std::unique_ptr<item_type>;
+        using item_vec_type = std::vector<p_item_type>;
+        err << "This is what an error message looks like, no other such msgs, it's a pass." << newl;
+        os << "Executing doggie kittie test..." << newl;
+
+        auto animals = [] () -> item_vec_type
+        {
+            auto ret = item_vec_type{};
+            ret.reserve(6U);
+            ret.push_back(std::make_unique<dog>("Muffy"sv, years_t{3}, 5));
+            ret.push_back(std::make_unique<dog>("Virgil"sv, years_t{15}, 42));
+            ret.push_back(std::make_unique<dog>("Rozzie"s, years_t{7}, 2));
+            ret.push_back(std::make_unique<cat>("Spencer Cat"s, years_t{13}, 1'321'368'932));
+            ret.push_back(std::make_unique<cat>("Miso Cat"s, years_t{2}, 10));
+            ret.push_back(std::make_unique<cat>("Kate T. Cat"_fs, years_t{20}, 932'392));
+            return ret;
+        }();
+        RG::shuffle(animals, std::mt19937_64{std::random_device{}()});
+        auto as_animals = animals | VW::transform([](p_item_type& p) -> item_type& { return *p; });
+        auto as_c_animals = animals | VW::transform([](p_item_type& p) -> const item_type& { return *p; });
+        RG::shuffle(animals, std::mt19937_64{std::random_device{}()});
+        std::size_t rounds_remaining = 20U;
+        while (--rounds_remaining > 0U)
+        {
+            fmt::println(os, "{:L} animal noise rounds remaining...", rounds_remaining);
+
+            for (auto& animal : as_animals)
+            {
+                os << animal << newl;
+                os << "\tnoise transcript: \"" << animal.emit_animal_noise() << "\"" << newl;
+                os << "..............." << newl;
+            }
+        }
+
+        os << "Thank you for attention.  Here were our participants: " << newl;
+        for (const auto& animal : as_c_animals)
+        {
+            os << animal << " thanks you!" << newl;
+        }
+
     }
 }
 template<cps::ct_string::stream_per_format_test::derived_from_animal TDerived>
