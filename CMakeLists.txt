@@ -34,7 +34,7 @@ target_link_libraries(test_console_app PRIVATE cstr_view fmt::fmt ct_str_warning
 find_package(GTest CONFIG REQUIRED)
 
 add_executable(cstr_view_tests tests/cstr_view_tests.cpp)
-target_link_libraries(cstr_view_tests PRIVATE cstr_view GTest::gtest GTest::gtest_main fmt::fmt ct_str_warnings)
+target_link_libraries(cstr_view_tests PRIVATE cstr_view GTest::gtest GTest::gtest_main fmt::fmt-header-only ct_str_warnings)
 
 enable_testing()
 add_test(NAME cstr_view_tests COMMAND cstr_view_tests)
