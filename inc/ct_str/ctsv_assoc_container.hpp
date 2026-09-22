@@ -204,7 +204,7 @@ namespace cps::ct_string
         template<wide_stream_insertable_via_fmt_format T>
         struct wformat_proxy_impl<T>
         {
-            using char_type = char;
+            using char_type = wchar_t;
             using string_type = std::basic_string<char_type>;
             string_type operator()(const T& t) const
             {
@@ -234,6 +234,10 @@ namespace cps::ct_string
     }
 
 
+    namespace function_objects
+    {
+        
+    }
 }
 #ifdef CPS_CTSV_STRING_VIEW_STD_NARROW_FUNC
 #undef CPS_CTSV_STRING_VIEW_STD_NARROW_FUNC
