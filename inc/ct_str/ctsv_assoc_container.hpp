@@ -256,7 +256,108 @@ namespace cps::ct_string
 
     namespace function_objects
     {
-        
+
+        template<std_char TChar>
+        struct make_char_ascii_lowercase final
+        {
+            using char_type = std::remove_cvref_t<TChar>;
+
+            constexpr char_type operator()(const char_type c) const noexcept
+            {
+                return static_cast<char_type>(exec(static_cast<char>(c)));
+            }
+
+            constexpr char_type operator()(const char_type c) const noexcept requires std::same_as<char_type, char>
+            {
+                return exec(c);
+            }
+
+        private:
+
+            [[nodiscard]] constexpr char exec(const char c) const noexcept
+            {
+                return c >= 'A' && c <= 'Z' ? static_cast<char_type>(c - 'A' + 'a') : c;
+            }
+        };
+
+        template<std_char TChar>
+        struct make_char_ascii_uppercase final
+        {
+            using char_type = std::remove_cvref_t<TChar>;
+
+            constexpr char_type operator()(const char_type c) const noexcept
+            {
+                return static_cast<char_type>(exec(static_cast<char>(c)));
+            }
+
+            constexpr char_type operator()(const char_type c) const noexcept requires std::same_as<char_type, char>
+            {
+                return exec(c);
+            }
+
+
+        private:
+
+            [[nodiscard]] constexpr char exec(const char c) const noexcept
+            {
+                return c >= 'a' && c <= 'z' ? static_cast<char_type>(c - 'a' + 'A') : c;
+            }
+        };
+
+
+        using ct_string::nothrow_convertible_to;
+
+        using ct_cstring_view = cps::ct_string::ct_cstring_view;
+        using ct_string_view = cps::ct_string::ct_string_view;
+
+        template<std_char TChar>
+        struct ci_three_way_comp
+        {
+            using char_type = std::remove_cvref_t<TChar>;
+            using c_ctsv_type = basic_ct_string_view<char_type, true>;
+            using ctsv_type = basic_ct_string_view<char_type, false>;
+            using std_sv_type = std::basic_string_view<char_type>;
+
+            template<typename T>
+            static constexpr bool valid_fallback_arg_v = !same_wo_qual<T, c_ctsv_type> && !same_wo_qual<T, ctsv_type> && !same_wo_qual<T, std_sv_type> && std::convertible_to<T, std_sv_type>;
+
+            using is_transparent = std::true_type;
+
+            template<typename TFallback1, typename TFallback2>
+                requires (valid_fallback_arg_v<TFallback1> && valid_fallback_arg_v<TFallback2>)
+            constexpr std::strong_ordering operator()(const TFallback1& lhs,
+                const TFallback2& rhs) const noexcept(nothrow_convertible_to<decltype(lhs), std_sv_type> && nothrow_convertible_to<decltype(rhs), std_sv_type>)
+            {
+                const std::string_view lv = lhs;
+                const std::string_view rv = rhs;
+                return exec(lv, rv);
+            }
+
+        private:
+            static constexpr std::strong_ordering exec(std::string_view lhs, std::string_view rhs) noexcept
+            {
+                auto lower_left = lhs | std::views::transform(make_char_ascii_lowercase<char>{});
+                auto lower_right = rhs | std::views::transform(make_char_ascii_lowercase<char>{});
+                return std::lexicographical_compare_three_way(lower_left.begin(), lower_left.end(), lower_right.begin(), lower_right.end());
+            }
+        };
+
+        struct ci_less
+        {
+            using is_transparent = std::true_type;
+            constexpr bool operator()(nothrow_convertible_to<std::string_view> auto const& lhs, nothrow_convertible_to<std::string_view> auto const& rhs) const noexcept
+            {
+                const std::string_view lv = lhs;
+                const std::string_view rv = rhs;
+                // std::ranges::less compares two ELEMENTS (it requires totally_ordered_with);
+                // it has no idea how to order two RANGES. Ordering ranges element-by-element
+                // is std::ranges::lexicographical_compare's job. Here the case folding is
+                // done with a PROJECTION rather than a transform_view -- same result, but no
+                // intermediate view need be formed on either side.
+                return std::ranges::lexicographical_compare(lv, rv,
+                    std::ranges::less{}, make_char_ascii_lowercase<char>{}, make_char_ascii_lowercase<char>{});
+            }
+        };
     }
 }
 #ifdef CPS_CTSV_STRING_VIEW_STD_NARROW_FUNC

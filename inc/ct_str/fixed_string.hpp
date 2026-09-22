@@ -29,10 +29,39 @@ namespace cps::ct_string
     template<std_char TChar, std::size_t CSTR_LEN>
         requires (CSTR_LEN > 0)
     struct basic_fixed_string;
+gi
+    namespace detail
+    {
+        template<typename T1, typename T2>
+        concept nothrow_convertible_to_IMPL = std::is_nothrow_convertible_v<T1, T2>;
+    }
 
     /// \brief shorthand for std::remove_cv_t: removes top-level const and volatile
     template<typename T>
     using wo_cv_t = std::remove_cv_t<T>;
+
+    template<typename T1, typename T2>
+    concept nothrow_convertible_to = std::convertible_to<T1, T2> && detail::nothrow_convertible_to_IMPL<T1, T2>;
+
+    template<typename T>
+    using wo_qual_t = std::remove_cvref_t<T>;
+
+    template<typename T1, typename T2>
+    concept same_wo_qual = std::same_as<wo_qual_t<T1>, wo_qual_t<T2>>;
+
+    template<typename T1, typename T2>
+    concept not_same_unqual_type_convertible_to = !same_wo_qual<T1, T2> && std::convertible_to<T1, T2>;
+
+    template<typename T1, typename T2>
+    concept not_exact_same_convertible_to = !std::same_as<T1, T2> && std::convertible_to<T1, T2>;
+
+    template<typename T1, typename T2>
+    concept not_same_unqual_type_nothrow_convertible_to = not_same_unqual_type_convertible_to<T1, T2>
+        && nothrow_convertible_to<T1, T2>;
+
+    template<typename T1, typename T2>
+    concept not_exact_same_nothrow_convertible_to = !std::same_as<T1, T2> && std::convertible_to<T1, T2>;
+
 
     namespace detail
     {
@@ -47,22 +76,12 @@ namespace cps::ct_string
           requires (CSTR_LEN > 0)
         struct is_basic_fixed_string<const basic_fixed_string<TChar, CSTR_LEN>> : std::true_type {};
 
-        template<typename TSrc, typename TDst>
-        concept nothrow_convertible_to_IMPL = std::is_nothrow_convertible_v<TSrc, TDst>;
     }
 
     /// \brief Concept structurally constraining a type to be an instantiation of
     /// basic_fixed_string
     template<typename T>
     concept basic_fixed_string_type = detail::is_basic_fixed_string<wo_cv_t<T>>::value;
-
-    /// \brief Requires that 1) TSre be std::convertible_to<TDst> and 2) that it be
-    /// so-convertible without the possibility of throwing an exception
-    /// \remarks The standard does not require that const char* be nothrow convertible to std::string_view
-    /// but on clang, gcc, msvc they are.
-    template<typename TSrc, typename TDst>
-    concept nothrow_convertible_to = std::convertible_to<TSrc, TDst> &&
-        detail::nothrow_convertible_to_IMPL<TSrc, TDst>;
 
     /// \brief Yields the length of two concatenated cstrings.
     template<std::size_t CSTR_LEN1, std::size_t CSTR_LEN2>
