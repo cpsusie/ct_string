@@ -18,6 +18,7 @@
 #include <fmt/ostream.h>
 #include "ct_str/ctsv_assoc_container.hpp"
 #include "setup_streams.hpp"
+#include "fmt_reg_demo.hpp"
 
 static constexpr auto newl = '\n';
 namespace cps::ct_string::stream_per_format_test
@@ -342,6 +343,9 @@ int main()
     std::cout << newl << "Doggie Kitty test: " << newl;
     cps::ct_string::stream_per_format_test::run_doggy_kitty_test(std::cout, std::cerr);
 
+    std::cout << newl << "formatter registration demo: " << newl;
+    cps::ct_string::test_app::run_demo_auto_stream_insert_test(std::cout, std::cerr);
+
     return 0;
 }
 using namespace cps::ct_string::literals;
@@ -492,6 +496,16 @@ namespace cps::ct_string::stream_per_format_test
         int m_mice_caught{0};
     };
 
+    class narrow_and_wide_formattable
+    {
+    public:
+        [[nodiscard]] constexpr CHR::seconds duration() const noexcept { return m_duration; }
+
+        constexpr narrow_and_wide_formattable(CHR::seconds dur) noexcept : m_duration{dur} {}
+        constexpr narrow_and_wide_formattable() noexcept : narrow_and_wide_formattable{CHR::seconds{0}} {}
+    private:
+        std::chrono::seconds m_duration{};
+    };
 
 }
 

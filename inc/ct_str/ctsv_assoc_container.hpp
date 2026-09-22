@@ -99,6 +99,26 @@ namespace cps::ct_string
         { os << t } -> std::same_as<std::wostream&>;
     };
 
+    // Registering a std_formattable or fmt_formattable type as true for these
+    // values allows for narrow or wide stream insertion to be made possible via ONE OF std::format or fmt::format.
+    //
+    // Do not register types that are already stream insertable.  It will likely cause ambiguous symbol resolution
+    // error during compilation or may switch between the defined and via-std/fmt:: format-synthesized operator.
+    //
+    // Do not register the same type as true for both std::format and fmt::format.  The concepts
+    // that make use of these are configured to reject anything that attempts to register for both the std and
+    // format varieties.
+    //
+    // If your type is std_formattable AND fmt_fotmattable: no problems.  Just pick ONE of the two format functions:
+    // if you want to use std::format, register it as true for g_k_stream_insert_via_std_format.
+    // If you want to use fmt::format, register it as true for g_k_stream_insert_via_fmt_format.
+    // Do not register it as true for both.
+    //
+    // Note that the narrow and wide facilities are independent of each other.
+    //
+    //  Usage directions: see example in fmt_reg_demo.hpp and fmt_reg_demo.cpp
+
+
     template<std_formattable T>
     inline constexpr bool g_k_stream_insert_via_std_format = false;
 

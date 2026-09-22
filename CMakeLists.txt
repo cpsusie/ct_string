@@ -35,6 +35,7 @@ add_executable(test_console_app
         test_console_app/main.cpp
         test_console_app/impl_views.cpp
         test_console_app/setup_streams.cpp
+        test_console_app/fmt_reg_demo.cpp
 )
 target_link_libraries(test_console_app PRIVATE cstr_view fmt::fmt ct_str_warnings)
 
