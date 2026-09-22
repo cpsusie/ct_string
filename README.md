@@ -28,7 +28,7 @@ const char*  cs   = sv.c_str();               // ...that ALSO has c_str()
 - [Use case 1: `c_str()` without copying or allocating](#use-case-1-c_str-without-copying-or-allocating)
 - [Use case 2: views that cannot dangle](#use-case-2-views-that-cannot-dangle)
 - [Use case 3: a string as a non-type template parameter](#use-case-3-a-string-as-a-non-type-template-parameter)
-- [Use case 4: heterogeneous lookup in maps & sets](#use-case-4-heterogeneous-lookup-in-maps--sets)
+- [Use case 4: associative containers & case-insensitive lookup](#use-case-4-associative-containers--case-insensitive-lookup)
 - [Use case 5: formatting](#use-case-5-formatting)
 - [The two flavors of `basic_ct_string_view`](#the-two-flavors-of-basic_ct_string_view)
 - [Defining Static-Member or Global Constants](#Defining-Static-Member-or-Global-Constants)
@@ -305,61 +305,146 @@ C APIs.
 
 ---
 
-## Use case 4: heterogeneous lookup in maps & sets
-
-Both flavors of `basic_ct_string_view` ship with:
-
-- a transparent `std::hash` specialization,
-- transparent `operator==` / `operator<=>` overloads against any type
-  nothrow-convertible to the corresponding `std::basic_string_view`
-  (covers `std::basic_string`, `std::basic_string_view`, the opposite
-  flavor of view, and `basic_fixed_string` of the same character type).
-
-The library exposes pre-wired container aliases that engage C++20
-heterogeneous lookup without any user-side template gymnastics:
-
+## Use case 4: associative containers & case-insensitive lookup
+### The problem
+`basic_ct_string_view` makes an excellent map key: two words wide, trivially
+copyable, and its storage is statically guaranteed to outlive the container.
+But it is deliberately *strict* -- you cannot build one from a
+`std::string_view`, because that would forge the compile-time provenance and
+null-termination guarantees that make it worth having.
+That strictness bites at **lookup** time, and the standard library's
+heterogeneous-lookup support is conspicuously incomplete:
+| Operation | Heterogeneous in the standard? |
+|---|---|
+| `find`, `contains`, `count`, `lower_bound`, `equal_range` | yes (C++14 ordered / C++20 unordered) |
+| `erase(key)` | only since C++23, under awkward constraints |
+| **`at(key)`** | **no -- takes `const key_type&`, full stop** |
+| `operator[]` | no (and correctly so: it *inserts*) |
+So the single most-reached-for operation -- "look this string up and give me
+the value" -- was the one that did not compile.
+### The fix: wrapper containers with an enforced insert/lookup asymmetry
+`<ct_str/ctsv_containers.hpp>` provides four class templates that encode the
+distinction in the type system:
+- **Inserting** (`operator[]`, `insert`, `emplace`, `try_emplace`, ...)
+  requires a real `basic_ct_string_view`. Nothing else can produce a key, so
+  the container can never hold a key whose storage it does not outlive.
+- **Looking up** (`at`, `at_if`, `find`, `contains`, `count`, `erase`,
+  `lower_bound`, ...) takes the `std::basic_string_view` **by value**. Every
+  `basic_ct_string_view` (either flavor), `std::basic_string`,
+  `basic_fixed_string` and string literal converts implicitly.
 ```c++
-#include <ct_str/ct_string_view.hpp>
-#include <string>
-#include <string_view>
-
+#include <ct_str/ctsv_containers.hpp>
 using namespace cps::ct_string;
 using namespace cps::ct_string::literals;
-
-ct_cstring_view_unordered_set s;           // unordered_set<ct_cstring_view, hash, equal_to<>>
-s.insert("hello"_ctsv);
-s.insert("world"_ctsv);
-
-bool a = s.contains(std::string_view{"hello"});  // heterogeneous, no temporary view
-auto fs = "hello"_fs;
-bool c = s.contains(fs);                         // heterogeneous against basic_fixed_string
-
-ct_cstring_view_map<int> m;                // map<ct_cstring_view, int, less<>>
-m.emplace("alpha"_ctsv, 1);
-auto it = m.find(std::string_view{"alpha"});     // heterogeneous
+ct_cstring_view_ci_map<int> ranks;     // ordered, ASCII case-INsensitive
+ranks["Ace"_ctsv]  = 14;               // insert: needs a real ct view
+ranks["King"_ctsv] = 13;
+ranks.at("ACE");                       // 14 -- from a string literal
+ranks.at(std::string{"ace"});          // 14 -- from a std::string
+ranks.at(std::string_view{"aCe"});     // 14 -- from a string_view
+ranks.contains("KING");                // true
+ranks.erase("king");                   // 1
+if (const int* p = ranks.at_if("queen"))   // non-throwing lookup
+{
+    // not reached
+}
+// ranks[std::string_view{"Ace"}] = 1;   // ILL-FORMED, by design.
 ```
-
-Available aliases (each has a `_set` / `_map<TValue>` / `_unordered_set` /
-`_unordered_map<TValue>` form, plus generic templates parameterised on
-`TChar` / `VALID_CSTR`):
-
-| Concrete alias | Container |
+`at_if` is the non-throwing sibling of `at`: it returns a pointer to the
+mapped value or `nullptr`. It is what you usually want -- no exception, and
+no `find`/`end()` dance.
+### Available containers
+Generic templates (every `std_char` type is supported):
+```c++
+basic_ctsv_map<TChar, VALID_CSTR, TValue, TLess = ctsv_less<TChar>>
+basic_ctsv_set<TChar, VALID_CSTR, TLess = ctsv_less<TChar>>
+basic_ctsv_unordered_map<TChar, VALID_CSTR, TValue,
+                         THash = ctsv_hash<TChar>, TEq = ctsv_equal_to<TChar>>
+basic_ctsv_unordered_set<TChar, VALID_CSTR,
+                         THash = ctsv_hash<TChar>, TEq = ctsv_equal_to<TChar>>
+```
+Convenience aliases are spelled out for `char` and `wchar_t` in both flavors,
+case-sensitive and case-insensitive. Insert `_ci_` for the case-insensitive
+form:
+| Case-sensitive | Case-insensitive |
 |---|---|
-| `ct_cstring_view_set`  / `ct_string_view_set`  / `ct_wcstring_view_set`  / `ct_wstring_view_set`  | `std::set<..., std::less<>>` |
-| `ct_cstring_view_map<V>`  / `ct_string_view_map<V>`  / `ct_wcstring_view_map<V>`  / `ct_wstring_view_map<V>`  | `std::map<..., V, std::less<>>` |
-| `ct_cstring_view_unordered_set`  / `ct_string_view_unordered_set`  / `ct_wcstring_view_unordered_set`  / `ct_wstring_view_unordered_set`  | `std::unordered_set<..., std::hash<...>, std::equal_to<>>` |
-| `ct_cstring_view_unordered_map<V>` / `ct_string_view_unordered_map<V>` / `ct_wcstring_view_unordered_map<V>` / `ct_wstring_view_unordered_map<V>` | `std::unordered_map<..., V, std::hash<...>, std::equal_to<>>` |
-
-Why is this nontrivial? C++20 heterogeneous lookup in unordered containers
-requires both `Hash::is_transparent` *and* `KeyEqual::is_transparent`.
-The library's `std::hash` specialization is transparent; the aliases
-additionally pass `std::equal_to<>` (which is also transparent and works
-because of the comparison-operator templates on the view) so that the
-ergonomic call sites above just work. See the doc comments in
-`ct_string_view.hpp` for the rationale and caveats (notably that lookup
-keys must be nothrow-convertible to the corresponding
-`std::basic_string_view`, which excludes raw `const TChar*`).
-
+| `ct_cstring_view_set` / `ct_string_view_set` / `ct_wcstring_view_set` / `ct_wstring_view_set` | `ct_cstring_view_ci_set` / `ct_string_view_ci_set` / ... |
+| `ct_cstring_view_map<V>` / `ct_string_view_map<V>` / ... | `ct_cstring_view_ci_map<V>` / ... |
+| `ct_cstring_view_unordered_set` / ... | `ct_cstring_view_ci_unordered_set` / ... |
+| `ct_cstring_view_unordered_map<V>` / ... | `ct_cstring_view_ci_unordered_map<V>` / ... |
+`multimap` / `multiset` wrappers are not provided.
+### Comparators and hashers
+`<ct_str/ctsv_comparators.hpp>` supplies the function objects, each in a
+case-sensitive and an ASCII-case-insensitive flavor, templated on the
+character type:
+| Case-sensitive | Case-insensitive | Result |
+|---|---|---|
+| `ctsv_less<TChar>` | `ctsv_ci_less<TChar>` | `bool` |
+| `ctsv_equal_to<TChar>` | `ctsv_ci_equal_to<TChar>` | `bool` |
+| `ctsv_three_way<TChar>` | `ctsv_ci_three_way<TChar>` | `strong_ordering` / **`weak_ordering`** |
+| `ctsv_hash<TChar>` | `ctsv_ci_hash<TChar>` | `std::size_t`, **`constexpr`** |
+All of them are usable standalone -- as sort predicates, projections, or in
+your own containers:
+```c++
+std::vector<std::string_view> v{"delta", "Alpha", "charlie", "Bravo"};
+std::ranges::sort(v, ctsv_ci_less<char>{});     // Alpha, Bravo, charlie, delta
+static_assert(ctsv_ci_hash<char>{}("Ace") == ctsv_ci_hash<char>{}("ACE"));
+```
+Three things are worth knowing:
+1. **The fold direction is observable.** These fold *down*. `'_'` is `0x5F`,
+   between `'Z'` (`0x5A`) and `'a'` (`0x61`), so folding down makes `"Z"`
+   sort *after* `"_"`. Folding up would give the opposite order. Both are
+   valid strict weak orderings; you just need to know which you have.
+2. **Case-insensitive ordering is *weak*, not strong.** `"abc"` and `"ABC"`
+   are equivalent without being equal, so `ctsv_ci_three_way` returns
+   `std::weak_ordering` while `ctsv_three_way` returns `std::strong_ordering`.
+3. **`ctsv_hash` is not `std::hash`.** `std::hash` is not `constexpr`, which
+   rules out compile-time container construction and `static_assert`-based
+   testing, so these are FNV-1a over code units. If you need the standard
+   library's hash instead, pass `std::hash<basic_ct_string_view<TChar, B>>`
+   explicitly -- it is transparent and pairs correctly with `std::equal_to<>`.
+### ASCII only
+Case folding touches only `'A'`..`'Z'` / `'a'`..`'z'`. Every other code unit,
+including every code unit `>= 0x80`, passes through unchanged. This is safe
+for UTF-8/16/32 (no code unit of a non-ASCII character can be mistaken for an
+ASCII letter) but it does mean `"CAFÉ"` and `"café"` do **not** compare equal.
+Full Unicode case folding needs the `CaseFolding.txt` tables and multi-code-
+point expansion (`ß` folds to `ss`, changing the length), which is a project
+of its own; see the `\todo` in `char_fold.hpp`.
+### Concepts
+The requirements on a comparator are spelled out as concepts rather than left
+to documentation, so getting one wrong is a diagnostic rather than a silent
+fallback to homogeneous lookup:
+```c++
+transparent_ctsv_less<F, TChar>        // ordered containers' Compare
+transparent_ctsv_equal_to<F, TChar>    // unordered containers' KeyEqual
+transparent_ctsv_three_way<F, TChar>
+transparent_ctsv_hash<F, TChar>        // unordered containers' Hash
+consistent_ctsv_hash_equal<THash, TEq, TChar>
+```
+Each requires nothrow default-constructibility, a nested `is_transparent`,
+and correct, `noexcept` behaviour over *every* pairing of
+`{cstr-flavor view, non-cstr-flavor view, std::basic_string_view}` in both
+argument orders. `std::less<>` and `std::equal_to<>` satisfy them;
+`std::less<std::string_view>` does not (it is not transparent).
+`consistent_ctsv_hash_equal` deserves special mention. The unordered-container
+invariant is that equal keys hash equally, and pairing a case-insensitive
+equality with a case-sensitive hash violates it *silently* -- the container
+would hold both `"Ace"` and `"ACE"` while reporting them equal. The wrappers'
+`requires`-clause rejects that mixture at compile time. Participation is
+declared via the `ctsv_folds_case` trait, which defaults to `false`, so types
+that know nothing about this library (`std::hash`, `std::equal_to<>`) pair
+correctly with one another.
+### Migrating from the old aliases
+Earlier versions exposed plain alias templates
+(`basic_ct_string_view_map`, `..._unordered_set`, and the per-flavor
+spellings) in `ct_string_view.hpp`. Those are gone. The concrete alias
+*names* are unchanged -- `ct_cstring_view_map<V>` still works -- but they now
+name the wrapper class templates, so you must include
+`<ct_str/ctsv_containers.hpp>` rather than relying on `ct_string_view.hpp`,
+which no longer pulls in `<map>`/`<set>`/`<unordered_map>`/`<unordered_set>`.
+The generic `basic_ct_string_view_*` alias templates are replaced by
+`basic_ctsv_*`; `multimap`/`multiset` forms are not carried over.
 ---
 
 ## Use case 5: formatting
@@ -720,6 +805,23 @@ ctest --test-dir build --output-on-failure
 
 GoogleTest is used and is located via `find_package(GTest CONFIG REQUIRED)`.
 
+### Language standard: library vs. tests
+
+The **library is C++20**, and the `cstr_view` interface target advertises that
+floor with `target_compile_features(cstr_view INTERFACE cxx_std_20)`. The
+**tests and the demo console app are C++23** (the console app uses
+`std::expected`); they request it per-target with
+`target_compile_features(... PRIVATE cxx_std_23)` rather than by raising
+`CMAKE_CXX_STANDARD` for the rest of the build.
+
+To keep those two facts from drifting apart, the build includes a
+`cstr_view_cxx20_smoke` static library: one translation unit
+([`tests/cxx20_header_smoke.cpp`](tests/cxx20_header_smoke.cpp)) that includes
+every public header, instantiates the templates, and is **pinned** to C++20 via
+target properties. A C++23-only construct landing in `inc/ct_str` therefore
+breaks that target immediately instead of only breaking downstream users on
+older toolchains.
+
 ---
 
 ## Requirements
@@ -730,6 +832,10 @@ GoogleTest is used and is located via `find_package(GTest CONFIG REQUIRED)`.
   - `consteval`,
   - three-way comparison.
 - Tested with MSVC (Visual Studio 2022 / cl 19.4x Windows 11, x86_64) and G++ (11.5 ubuntu x86_64, Linux).
+- Verified on Linux/x86_64 with **GCC 13**, GCC 14 and Clang 19 (library at
+  C++20, tests at C++23). GCC 13 matters as the low-water mark: its libstdc++
+  predates `std::ranges::to` (P1206R7), so nothing in the library -- or in the
+  tests -- may depend on it.
 - Tested with and without `fmtlib`.
 - The optional `std::formatter` support requires `<format>`
   (`__cpp_lib_format >= 201907L`).
