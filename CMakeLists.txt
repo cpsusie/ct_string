@@ -42,7 +42,11 @@ target_link_libraries(test_console_app PRIVATE cstr_view fmt::fmt ct_str_warning
 # unit tests
 find_package(GTest CONFIG REQUIRED)
 
-add_executable(cstr_view_tests tests/cstr_view_tests.cpp)
+add_executable(cstr_view_tests
+        tests/cstr_view_tests.cpp
+        tests/ctsv_comparators_tests.cpp
+        tests/ctsv_containers_tests.cpp
+)
 target_link_libraries(cstr_view_tests PRIVATE cstr_view GTest::gtest GTest::gtest_main fmt::fmt-header-only ct_str_warnings)
 
 enable_testing()

@@ -16,7 +16,7 @@
 #include <fmt/format.h>
 #include <fmt/xchar.h>
 #include <fmt/ostream.h>
-#include "ct_str/ctsv_assoc_container.hpp"
+#include "ct_str/ctsv_format_registration.hpp"
 #include "setup_streams.hpp"
 #include "fmt_reg_demo.hpp"
 

@@ -134,10 +134,11 @@ namespace cps::ct_string::test_app
             os << R"(  std L"{:L}"     : )";
             write_to_stream(os, std::format(L"{:L}", nwf)) << newl;
 
-            // The synthesized operator<< CANNOT be grouped: ctsv_assoc_container.hpp
-            // hard-codes fmt::format(L"{}", v) / std::format("{}", v). A stream
-            // inserter has no channel through which to pass a format spec. If you
-            // need a spec, call format yourself (or imbue + use a spec-aware path).
+            // The synthesized operator<< CANNOT be grouped:
+            // ctsv_format_registration.hpp hard-codes fmt::format(L"{}", v) /
+            // std::format("{}", v). A stream inserter has no channel through
+            // which to pass a format spec. If you need a spec, call format
+            // yourself (or imbue + use a spec-aware path).
             os << "  (operator<< has no spec channel -> never grouped)" << newl;
         }
 

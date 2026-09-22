@@ -29,7 +29,7 @@ namespace cps::ct_string
     template<std_char TChar, std::size_t CSTR_LEN>
         requires (CSTR_LEN > 0)
     struct basic_fixed_string;
-gi
+
     namespace detail
     {
         template<typename T1, typename T2>
@@ -61,6 +61,36 @@ gi
 
     template<typename T1, typename T2>
     concept not_exact_same_nothrow_convertible_to = !std::same_as<T1, T2> && std::convertible_to<T1, T2>;
+
+    /// \brief A type from which a std::string can be constructed AND to which a
+    /// std::string can be assigned.
+    ///
+    /// Both halves matter. Requiring construction alone would admit types that
+    /// can seed a string but cannot re-seed one, which is exactly the operation
+    /// a "reset this object from a new source" member needs.
+    ///
+    /// \remarks std::constructible_from is required in addition to the braced
+    /// form because the two differ for types with explicit conversions in ways
+    /// that callers have historically depended upon; requiring both keeps the
+    /// concept's membership stable.
+    template<typename TSource>
+    concept string_source = std::constructible_from<std::string, TSource>
+        && requires (TSource&& src, std::string& dst)
+    {
+        { std::string{std::forward<TSource>(src)} } -> std::same_as<std::string>;
+        { dst = std::forward<TSource>(src) } -> std::same_as<std::string&>;
+    };
+
+    /// \brief A string_source whose construction and assignment are both
+    /// noexcept. Used to propagate conditional noexcept through wrappers that
+    /// take an arbitrary string source.
+    template<typename TSource>
+    concept nothrow_string_source = string_source<TSource>
+        && requires (TSource&& src, std::string& dst)
+    {
+        { std::string{std::forward<TSource>(src)} } noexcept -> std::same_as<std::string>;
+        { dst = std::forward<TSource>(src) } noexcept -> std::same_as<std::string&>;
+    };
 
 
     namespace detail

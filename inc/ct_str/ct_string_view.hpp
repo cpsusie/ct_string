@@ -14,10 +14,6 @@
 #include <span>
 #include <ranges>
 #include <functional> // std::less<>, std::equal_to<>, std::hash
-#include <map>
-#include <set>
-#include <unordered_map>
-#include <unordered_set>
 #include <version> // for feature-test macros (__cpp_lib_format etc.)
 #if defined(__cpp_lib_format) && (__cpp_lib_format >= 201907L)
 #  include <format>
@@ -685,147 +681,26 @@ namespace cps::ct_string
     using ct_u32string_view = basic_ct_string_view<char32_t, false>;
 
     // ------------------------------------------------------------------
-    // Heterogeneous-lookup-friendly container aliases.
+    // Associative containers
     //
-    // The library provides aliases that pre-wire the standard associative and
-    // unordered-associative containers with the function objects required to
-    // make heterogeneous lookup actually engage when the key type is a
-    // basic_ct_string_view:
+    // The heterogeneous-lookup-friendly container ALIASES that used to live
+    // here (basic_ct_string_view_map, ..._unordered_set and their per-flavor
+    // spellings) have been superseded by the wrapper class templates in
+    // <ct_str/ctsv_containers.hpp>, which keep the same convenience-alias
+    // names but additionally make at(), at_if() and erase() accept a
+    // std::basic_string_view -- something the raw std:: containers cannot do,
+    // because std::map::at and std::unordered_map::at have no heterogeneous
+    // overload.
     //
-    //   * Ordered containers (map/set/multimap/multiset): C++14 heterogeneous
-    //     lookup is gated solely on Compare::is_transparent. The standard
-    //     std::less<> (the void specialization) is itself transparent and
-    //     dispatches via operator< / operator<=>, which we provide for any
-    //     type nothrow-convertible to std_sv_type. So passing std::less<> as
-    //     the comparator is sufficient. No transparent equal_to is needed
-    //     (these containers don't use one).
+    // This header deliberately does NOT include <map>, <set>, <unordered_map>
+    // or <unordered_set>: it is the core vocabulary header and should stay
+    // cheap. Include <ct_str/ctsv_containers.hpp> when you want containers,
+    // or <ct_str/ctsv_comparators.hpp> for just the transparent comparators.
     //
-    //   * Unordered containers (unordered_map/set/multimap/multiset): C++20
-    //     heterogeneous lookup is gated on BOTH Hash::is_transparent and
-    //     KeyEqual::is_transparent. The std::hash<basic_ct_string_view<...>>
-    //     specialization below is transparent and offers overloads for
-    //     std::basic_string_view, std::basic_string, the opposite-flavor
-    //     basic_ct_string_view, and const char_type*. The KeyEqual must also
-    //     be transparent; std::equal_to<> (the void specialization) is and
-    //     dispatches via operator==, which we provide for any type
-    //     nothrow-convertible to std_sv_type.
-    //
-    // Usage example:
-    //     ct_cstring_view_set s;                      // a std::set
-    //     s.insert(make_ctsv<"hello">());
-    //     bool found = s.contains(std::string_view{"hello"}); // heterogeneous
-    //
-    //     ct_cstring_view_unordered_set us;           // a std::unordered_set
-    //     us.insert(make_ctsv<"world">());
-    //     auto it = us.find(std::string_view{"world"});       // heterogeneous
-    //
-    // Caveats:
-    //   * Lookup keys must be nothrow-convertible to the view's std_sv_type
-    //     (that is the precondition of the comparison-operator templates).
-    //     std::basic_string, std::basic_string_view, basic_fixed_string of
-    //     the same character type, and the opposite-flavor basic_ct_string_view
-    //     all qualify; a bare const char_type* does NOT, because the relevant
-    //     basic_string_view ctor is not noexcept. To look up by raw pointer,
-    //     either build a string_view from it at the call site or relax the
-    //     comparison templates' constraint.
-    //   * For unordered containers the same caveat applies to the hasher: a
-    //     raw const char_type* hashes via the dedicated overload here, but
-    //     the equality side still has to be reachable via the comparison
-    //     operators, so wrap raw pointers as string_views at the call site.
+    // The std::hash specialization for basic_ct_string_view remains at the
+    // bottom of this header: it is the hasher std::unordered_* picks by
+    // default for this key type, so it belongs with the type it hashes.
     // ------------------------------------------------------------------
-
-    /// \brief std::map<Key, TValue> with Key = basic_ct_string_view<TChar, VALID_CSTR>
-    /// pre-parameterized with std::less<> so heterogeneous lookup is enabled.
-    template<std_char TChar, bool VALID_CSTR, typename TValue>
-    using basic_ct_string_view_map =
-        std::map<basic_ct_string_view<TChar, VALID_CSTR>, TValue, std::less<>>;
-
-    /// \brief std::multimap counterpart of basic_ct_string_view_map.
-    template<std_char TChar, bool VALID_CSTR, typename TValue>
-    using basic_ct_string_view_multimap =
-        std::multimap<basic_ct_string_view<TChar, VALID_CSTR>, TValue, std::less<>>;
-
-    /// \brief std::set of basic_ct_string_view pre-parameterized with
-    /// std::less<> so heterogeneous lookup is enabled.
-    template<std_char TChar, bool VALID_CSTR>
-    using basic_ct_string_view_set =
-        std::set<basic_ct_string_view<TChar, VALID_CSTR>, std::less<>>;
-
-    /// \brief std::multiset counterpart of basic_ct_string_view_set.
-    template<std_char TChar, bool VALID_CSTR>
-    using basic_ct_string_view_multiset =
-        std::multiset<basic_ct_string_view<TChar, VALID_CSTR>, std::less<>>;
-
-    /// \brief std::unordered_map<Key, TValue> pre-parameterized with the
-    /// transparent std::hash<basic_ct_string_view<...>> specialization
-    /// provided by this header and with std::equal_to<> as the (transparent)
-    /// key-equal predicate; together these enable C++20 heterogeneous lookup.
-    template<std_char TChar, bool VALID_CSTR, typename TValue>
-    using basic_ct_string_view_unordered_map =
-        std::unordered_map<basic_ct_string_view<TChar, VALID_CSTR>, TValue,
-            std::hash<basic_ct_string_view<TChar, VALID_CSTR>>, std::equal_to<>>;
-
-    /// \brief std::unordered_multimap counterpart of
-    /// basic_ct_string_view_unordered_map.
-    template<std_char TChar, bool VALID_CSTR, typename TValue>
-    using basic_ct_string_view_unordered_multimap =
-        std::unordered_multimap<basic_ct_string_view<TChar, VALID_CSTR>, TValue,
-            std::hash<basic_ct_string_view<TChar, VALID_CSTR>>, std::equal_to<>>;
-
-    /// \brief std::unordered_set pre-parameterized with the transparent hash
-    /// and std::equal_to<> for heterogeneous lookup.
-    template<std_char TChar, bool VALID_CSTR>
-    using basic_ct_string_view_unordered_set =
-        std::unordered_set<basic_ct_string_view<TChar, VALID_CSTR>,
-            std::hash<basic_ct_string_view<TChar, VALID_CSTR>>, std::equal_to<>>;
-
-    /// \brief std::unordered_multiset counterpart of
-    /// basic_ct_string_view_unordered_set.
-    template<std_char TChar, bool VALID_CSTR>
-    using basic_ct_string_view_unordered_multiset =
-        std::unordered_multiset<basic_ct_string_view<TChar, VALID_CSTR>,
-            std::hash<basic_ct_string_view<TChar, VALID_CSTR>>, std::equal_to<>>;
-
-    // -- Per-character-type / per-flavor convenience aliases ---------------
-    // (One pair per flavor for char and wchar_t -- the formatter-supported
-    // character types. UTF specializations are easy to write by hand if
-    // desired but elided here to keep the alias surface manageable.)
-
-    /// \brief std::set<ct_cstring_view, std::less<>>.
-    using ct_cstring_view_set        = basic_ct_string_view_set<char, true>;
-    /// \brief std::set<ct_string_view, std::less<>>.
-    using ct_string_view_set         = basic_ct_string_view_set<char, false>;
-    /// \brief std::set<ct_wcstring_view, std::less<>>.
-    using ct_wcstring_view_set       = basic_ct_string_view_set<wchar_t, true>;
-    /// \brief std::set<ct_wstring_view, std::less<>>.
-    using ct_wstring_view_set        = basic_ct_string_view_set<wchar_t, false>;
-
-    /// \brief std::map<ct_cstring_view, TValue, std::less<>>.
-    template<typename TValue> using ct_cstring_view_map  = basic_ct_string_view_map<char,    true,  TValue>;
-    /// \brief std::map<ct_string_view, TValue, std::less<>>.
-    template<typename TValue> using ct_string_view_map   = basic_ct_string_view_map<char,    false, TValue>;
-    /// \brief std::map<ct_wcstring_view, TValue, std::less<>>.
-    template<typename TValue> using ct_wcstring_view_map = basic_ct_string_view_map<wchar_t, true,  TValue>;
-    /// \brief std::map<ct_wstring_view, TValue, std::less<>>.
-    template<typename TValue> using ct_wstring_view_map  = basic_ct_string_view_map<wchar_t, false, TValue>;
-
-    /// \brief std::unordered_set with transparent hash and std::equal_to<>.
-    using ct_cstring_view_unordered_set  = basic_ct_string_view_unordered_set<char,    true>;
-    /// \brief std::unordered_set with transparent hash and std::equal_to<>.
-    using ct_string_view_unordered_set   = basic_ct_string_view_unordered_set<char,    false>;
-    /// \brief std::unordered_set with transparent hash and std::equal_to<>.
-    using ct_wcstring_view_unordered_set = basic_ct_string_view_unordered_set<wchar_t, true>;
-    /// \brief std::unordered_set with transparent hash and std::equal_to<>.
-    using ct_wstring_view_unordered_set  = basic_ct_string_view_unordered_set<wchar_t, false>;
-
-    /// \brief std::unordered_map with transparent hash and std::equal_to<>.
-    template<typename TValue> using ct_cstring_view_unordered_map  = basic_ct_string_view_unordered_map<char,    true,  TValue>;
-    /// \brief std::unordered_map with transparent hash and std::equal_to<>.
-    template<typename TValue> using ct_string_view_unordered_map   = basic_ct_string_view_unordered_map<char,    false, TValue>;
-    /// \brief std::unordered_map with transparent hash and std::equal_to<>.
-    template<typename TValue> using ct_wcstring_view_unordered_map = basic_ct_string_view_unordered_map<wchar_t, true,  TValue>;
-    /// \brief std::unordered_map with transparent hash and std::equal_to<>.
-    template<typename TValue> using ct_wstring_view_unordered_map  = basic_ct_string_view_unordered_map<wchar_t, false, TValue>;
 }
 
 /// \brief Opt in to ranges::borrowed_range, mirroring std::basic_string_view:
