@@ -17,6 +17,7 @@
 #include <fmt/xchar.h>
 #include <fmt/ostream.h>
 #include "ct_str/ctsv_assoc_container.hpp"
+#include "setup_streams.hpp"
 
 static constexpr auto newl = '\n';
 namespace cps::ct_string::stream_per_format_test
@@ -205,7 +206,8 @@ namespace cps::ct_string::stream_per_format_test
                 return std::move(strm).str();
             }(m_age);
             static constexpr auto fmt_str = detail::g_k_common_fields_fmt_str_v<char>;
-            fmt::println(os, fmt_str, m_id, exec_name(), years_old);
+            fmt::print(os, fmt_str, m_id, exec_name(), years_old);
+            os << newl;
             exec_write_self_details(os);
             os << newl << newl;
         }
@@ -315,6 +317,14 @@ int main()
     // Hash equivalence with std::string_view.
     using cps::ct_string::literals::operator""_ctsv;
     constexpr auto ctsv = "Hello, World!"_ctsv;
+
+    if (auto res = cps::ct_string::test_app::setup_streams(); !res )
+    {
+        std::cerr << "Failed to setup streams: " << res.error() << "\n";
+        return -1;
+    }
+
+
     const auto sv = std::string_view{"Hello, World!"};
     if (std::hash<ct_cstring_view>{}(ctsv) != std::hash<std::string_view>{}(sv))
     {
@@ -535,7 +545,7 @@ namespace cps::ct_string::stream_per_format_test
         std::size_t rounds_remaining = 20U;
         while (--rounds_remaining > 0U)
         {
-            fmt::println(os, "{:L} animal noise rounds remaining...", rounds_remaining);
+            fmt::print(os, "{:L} animal noise rounds remaining...{}", rounds_remaining, newl);
 
             for (auto& animal : as_animals)
             {

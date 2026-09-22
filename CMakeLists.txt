@@ -27,7 +27,15 @@ endif()
 add_library(ct_str_warnings INTERFACE)
 target_compile_options(ct_str_warnings INTERFACE ${CT_STR_WARNING_FLAGS})
 
-add_executable(test_console_app test_console_app/main.cpp test_console_app/impl_views.cpp)
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+add_executable(test_console_app
+        test_console_app/main.cpp
+        test_console_app/impl_views.cpp
+        test_console_app/setup_streams.cpp
+)
 target_link_libraries(test_console_app PRIVATE cstr_view fmt::fmt ct_str_warnings)
 
 # unit tests
