@@ -115,10 +115,15 @@ static_assert(std::is_same_v<
     decltype(std::declval<const ct_cstring_view_map<int>&>().at_if("k")), const int*>);
 
 // Range concepts: ordered containers are bidirectional, unordered are forward.
+// The unordered containers expose their underlying std::unordered_* iterators
+// verbatim, and the standard only mandates *forward* iterators there. Whether
+// they are additionally bidirectional is unspecified and does vary: libstdc++
+// models forward only, while the MSVC STL's bucket-list iterators are
+// bidirectional. So only the guaranteed (forward) half is asserted here.
 static_assert(std::ranges::bidirectional_range<ct_cstring_view_set>);
 static_assert(std::ranges::bidirectional_range<ct_cstring_view_map<int>>);
 static_assert(std::ranges::forward_range<ct_cstring_view_unordered_set>);
-static_assert(!std::ranges::bidirectional_range<ct_cstring_view_unordered_set>);
+static_assert(std::ranges::forward_range<ct_cstring_view_unordered_map<int>>);
 
 // Container-level introspection of the case policy.
 static_assert(!ct_cstring_view_unordered_map<int>::folds_case);
