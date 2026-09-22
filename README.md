@@ -805,6 +805,23 @@ ctest --test-dir build --output-on-failure
 
 GoogleTest is used and is located via `find_package(GTest CONFIG REQUIRED)`.
 
+### Language standard: library vs. tests
+
+The **library is C++20**, and the `cstr_view` interface target advertises that
+floor with `target_compile_features(cstr_view INTERFACE cxx_std_20)`. The
+**tests and the demo console app are C++23** (the console app uses
+`std::expected`); they request it per-target with
+`target_compile_features(... PRIVATE cxx_std_23)` rather than by raising
+`CMAKE_CXX_STANDARD` for the rest of the build.
+
+To keep those two facts from drifting apart, the build includes a
+`cstr_view_cxx20_smoke` static library: one translation unit
+([`tests/cxx20_header_smoke.cpp`](tests/cxx20_header_smoke.cpp)) that includes
+every public header, instantiates the templates, and is **pinned** to C++20 via
+target properties. A C++23-only construct landing in `inc/ct_str` therefore
+breaks that target immediately instead of only breaking downstream users on
+older toolchains.
+
 ---
 
 ## Requirements
@@ -815,6 +832,10 @@ GoogleTest is used and is located via `find_package(GTest CONFIG REQUIRED)`.
   - `consteval`,
   - three-way comparison.
 - Tested with MSVC (Visual Studio 2022 / cl 19.4x Windows 11, x86_64) and G++ (11.5 ubuntu x86_64, Linux).
+- Verified on Linux/x86_64 with **GCC 13**, GCC 14 and Clang 19 (library at
+  C++20, tests at C++23). GCC 13 matters as the low-water mark: its libstdc++
+  predates `std::ranges::to` (P1206R7), so nothing in the library -- or in the
+  tests -- may depend on it.
 - Tested with and without `fmtlib`.
 - The optional `std::formatter` support requires `<format>`
   (`__cpp_lib_format >= 201907L`).

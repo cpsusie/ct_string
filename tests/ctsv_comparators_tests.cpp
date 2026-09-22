@@ -14,6 +14,7 @@
 
 #include <algorithm>
 #include <compare>
+#include <concepts>
 #include <functional>
 #include <ranges>
 #include <string>
@@ -23,6 +24,33 @@
 using namespace cps::ct_string;
 using namespace cps::ct_string::literals;
 using namespace std::string_view_literals;
+
+namespace
+{
+    /// \brief Materializes a lazy character view into a std::string.
+    ///
+    /// \remarks Deliberately hand-rolled rather than `| std::ranges::to<
+    /// std::string>()`. std::ranges::to (P1206R7) is C++23 and libstdc++ only
+    /// shipped it in GCC 14, so using it here made the whole test suite
+    /// unbuildable on GCC 13 -- for no benefit, since the property under test
+    /// is what views::ascii_lower/_upper YIELD, not how it is collected. The
+    /// range-based for below exercises the view's iterators just as thoroughly.
+    template<std::ranges::input_range R>
+        requires std::same_as<std::ranges::range_value_t<R>, char>
+    [[nodiscard]] std::string fold_to_string(R&& r)
+    {
+        std::string out;
+        if constexpr (std::ranges::sized_range<R>)
+        {
+            out.reserve(std::ranges::size(r));
+        }
+        for (const char c : r)
+        {
+            out.push_back(c);
+        }
+        return out;
+    }
+}
 
 // ============================================================
 //  char_fold: per-code-unit folding
@@ -59,21 +87,21 @@ static_assert(ascii_to_lower<char32_t>(U'\U0001F600') == U'\U0001F600');
 TEST(CharFold, LowerViewIsLazyAndCorrect)
 {
     constexpr auto src = "HeLLo, World!"sv;
-    const auto folded = views::ascii_lower(src) | std::ranges::to<std::string>();
+    const auto folded = fold_to_string(views::ascii_lower(src));
     EXPECT_EQ(folded, "hello, world!");
 }
 
 TEST(CharFold, UpperViewIsCorrect)
 {
     constexpr auto src = "HeLLo, World!"sv;
-    const auto folded = views::ascii_upper(src) | std::ranges::to<std::string>();
+    const auto folded = fold_to_string(views::ascii_upper(src));
     EXPECT_EQ(folded, "HELLO, WORLD!");
 }
 
 TEST(CharFold, ViewWorksOnCtStringView)
 {
     static constexpr auto sv = "MiXeD"_ctsv;
-    const auto folded = views::ascii_lower(sv) | std::ranges::to<std::string>();
+    const auto folded = fold_to_string(views::ascii_lower(sv));
     EXPECT_EQ(folded, "mixed");
 }
 
@@ -82,8 +110,7 @@ TEST(CharFold, ViewLeavesNonAsciiBytesAlone)
     // UTF-8 for "CAFÉ": the 'É' is 0xC3 0x89 and must survive untouched while
     // the ASCII letters fold.
     const std::string src = "CAF\xC3\x89";
-    const auto folded =
-        views::ascii_lower(std::string_view{src}) | std::ranges::to<std::string>();
+    const auto folded = fold_to_string(views::ascii_lower(std::string_view{src}));
     EXPECT_EQ(folded, std::string{"caf\xC3\x89"});
 }
 
