@@ -28,7 +28,12 @@ target_include_directories(cstr_view INTERFACE
 # driver, so it must be routed to the /W4 /WX branch alongside real MSVC.
 if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC"
         OR (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC"))
-    set(CT_STR_WARNING_FLAGS /W4 /WX)
+    # C4702 (unreachable code) is emitted by the MSVC back end, which ignores
+    # /external:W0, so warnings originating in third-party headers such as
+    # <fmt/*.h> cannot be scoped away and would trip /WX. Disable it globally:
+    # it is a code-layout diagnostic we do not depend on. clang-cl accepts
+    # /wd4702 as a no-op, so this branch stays shared.
+    set(CT_STR_WARNING_FLAGS /W4 /WX /wd4702)
 elseif (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     set(CT_STR_WARNING_FLAGS -Wall -Wextra -Werror)
 endif()
