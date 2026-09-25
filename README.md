@@ -6,7 +6,7 @@ A small, header-only C++20 library providing two complementary types built on
 | Type | Header | What it is |
 |---|---|---|
 | `cps::ct_string::basic_fixed_string<TChar, N>` | `<ct_str/fixed_string.hpp>` | A fixed-capacity, null-terminated character buffer that is usable as a non-type template parameter (NTTP). |
-| `cps::ct_string::basic_ct_string_view<TChar, VALID_CSTR>` | `<ct_str/ct_string_view.hpp>` | A non-owning view that — when `VALID_CSTR == true` — is *statically known* to refer to a null-terminated, static-storage-duration character buffer. Safe to pass to C APIs. Cannot dangle. |
+| `cps::ct_string::basic_ct_string_view<TChar, VALID_CSTR>` | `<ct_str/ct_string_view.hpp>` | A non-owning view whose pointee is *statically guaranteed* to be a compile-time constant with static storage duration — and, when `VALID_CSTR == true`, guaranteed to be properly null-terminated. Safe to pass to C APIs. Cannot dangle. |
 
 If you have ever wanted to write something like
 
@@ -22,7 +22,9 @@ const char*  cs   = sv.c_str();               // ...that ALSO has c_str()
 
 ## Table of contents
 
+- [The core idea: compile-time provenance, expressed in the type system](#the-core-idea-compile-time-provenance-expressed-in-the-type-system)
 - [Why not just `std::string_view`?](#why-not-just-stdstring_view)
+- [Feature overview](#feature-overview)
 - [The two types at a glance](#the-two-types-at-a-glance)
 - [Quick start](#quick-start)
 - [Use case 1: `c_str()` without copying or allocating](#use-case-1-c_str-without-copying-or-allocating)
@@ -30,12 +32,81 @@ const char*  cs   = sv.c_str();               // ...that ALSO has c_str()
 - [Use case 3: a string as a non-type template parameter](#use-case-3-a-string-as-a-non-type-template-parameter)
 - [Use case 4: associative containers & case-insensitive lookup](#use-case-4-associative-containers--case-insensitive-lookup)
 - [Use case 5: formatting](#use-case-5-formatting)
+- [Use case 6: lazy ASCII case-folding views](#use-case-6-lazy-ascii-case-folding-views)
+- [Use case 7: opt-in stream insertion for formattable types](#use-case-7-opt-in-stream-insertion-for-formattable-types)
 - [The two flavors of `basic_ct_string_view`](#the-two-flavors-of-basic_ct_string_view)
-- [Defining Static-Member or Global Constants](#Defining-Static-Member-or-Global-Constants)
+- [Defining static-member or global constants](#defining-static-member-or-global-constants)
 - [Comparison cheat-sheet](#comparison-cheat-sheet)
 - [Building & integrating](#building--integrating)
 - [Requirements](#requirements)
 - [License](#license)
+
+---
+
+## The core idea: compile-time provenance, expressed in the type system
+
+The value proposition of this library is a single, unusual guarantee:
+
+> **If you hold a `basic_ct_string_view`, the characters it refers to are a
+> compile-time constant with static storage duration.** Optionally (the
+> `VALID_CSTR == true` flavor), the characters are also guaranteed to be
+> properly null-terminated.
+
+The natural objection is: *"That does nothing new. I can already point a
+`std::string_view` at a string literal, or store a `std::string`."* You can —
+but neither option lets you **state the invariant in the type system**, and
+that difference is the whole point:
+
+- **`std::string_view` is a promise made by convention.** Nothing stops a
+  colleague (or you, six months later) from binding one to a temporary
+  `std::string`, a stack buffer, or a slice with no null terminator. The
+  invariant "this field only ever refers to a compile-time constant" lives in
+  a comment, and comments do not fail to compile when violated.
+- **`std::string` is a promise paid for at runtime.** It enforces ownership
+  and null-termination, but by copying and (usually) allocating — a pointless
+  cost for data that is immutable and fully known at compile time.
+- **`basic_ct_string_view` is a promise enforced by the compiler.** Its only
+  public constructors are the copy/move/cross-flavor constructors and a
+  `consteval` factory path that consumes a `basic_fixed_string` NTTP — a
+  static-storage-duration object by definition. There is *no way* to forge
+  one from runtime data, so every copy, everywhere, carries the guarantee.
+
+Concretely: if a type has a field that is *designed* to only ever hold a
+compile-time constant string — an error-code message, a command name, a
+registered key, a log category — you can now say so via the type system:
+
+```c++
+struct error_info {
+    int code;
+    // By construction: a compile-time constant, null-terminated,
+    // static-storage-duration string. Cannot dangle. No runtime checks,
+    // no documentation discipline, no code-review vigilance required.
+    cps::ct_string::ct_cstring_view message;
+};
+
+constexpr error_info make_not_found() {
+    using namespace cps::ct_string::literals;
+    return {404, "not found"_ctsv};        // OK
+}
+
+// error_info oops{500, std::string{"boom"}};   // does not compile: no
+//                                              // constructor from runtime data
+```
+
+Compare the alternatives for that `message` field:
+
+| Field type | Dangling possible? | Null-termination guaranteed? | Copies / allocates? | Invariant enforced by |
+|---|---|---|---|---|
+| `const char*` | yes | no (and no size either) | no | convention |
+| `std::string_view` | yes | no | no | convention |
+| `std::string` | no | yes | **yes** | runtime |
+| `ct_cstring_view` | **no** | **yes** | **no** | **compiler** |
+
+The guarantee is also *transitive and free*: the view is two words wide and
+trivially copyable, so you can return it, store it in containers, pass it
+across threads, and hand `c_str()` to any C API — all without a single
+runtime check, copy, or allocation, and without ever being able to violate
+the invariant by accident.
 
 ---
 
@@ -66,6 +137,22 @@ properties that bite in production code:
 
 `basic_fixed_string` is the storage type that backs all of this and has its
 own use case: as a literal you can pass as a template argument.
+
+---
+
+## Feature overview
+
+Everything the library ships, header by header, with the value each piece
+adds:
+
+| Header | What it provides | Why you would want it |
+|---|---|---|
+| `<ct_str/fixed_string.hpp>` | `basic_fixed_string<TChar, N>`: a structural, NTTP-eligible, null-terminated character buffer with `consteval` concatenation (`operator+`), the `_fs` literal, and the full read-only string interface. | Strings as template arguments; compile-time string building and validation via `static_assert`. See [use case 3](#use-case-3-a-string-as-a-non-type-template-parameter). |
+| `<ct_str/ct_string_view.hpp>` | `basic_ct_string_view<TChar, VALID_CSTR>` in both flavors, the `_ctsv` literal, `make_ctsv`, `basic_ct_sv_factory`, `std::formatter` / optional `fmt::formatter` specializations, `std::hash` support, and `std::ranges::enable_borrowed_range` opt-in. | A `string_view` that cannot dangle, whose pointee is a compile-time constant, and (in the `known_cstr` flavor) offers a guaranteed-valid `c_str()`. See [use cases 1](#use-case-1-c_str-without-copying-or-allocating), [2](#use-case-2-views-that-cannot-dangle) and [5](#use-case-5-formatting). |
+| `<ct_str/char_fold.hpp>` | `constexpr`, allocation-free ASCII case folding: `ascii_to_lower` / `ascii_to_upper` function objects and the lazy range adaptors `views::ascii_lower` / `views::ascii_upper`. | Case-insensitive machinery you can use standalone — as projections, in your own algorithms — with zero allocation. See [use case 6](#use-case-6-lazy-ascii-case-folding-views). |
+| `<ct_str/ctsv_comparators.hpp>` | Transparent, `noexcept`, `constexpr`-friendly comparators and hashers (`ctsv_less`, `ctsv_equal_to`, `ctsv_three_way`, `ctsv_hash`, plus `_ci_` case-insensitive variants) and the concepts that specify them. | Correct heterogeneous comparison across `basic_ct_string_view`, `std::basic_string_view`, `basic_fixed_string`, `std::basic_string` and literals; a `constexpr` hash `std::hash` cannot give you. See [use case 4](#use-case-4-associative-containers--case-insensitive-lookup). |
+| `<ct_str/ctsv_containers.hpp>` | `map` / `set` / `unordered_map` / `unordered_set` wrappers keyed on `basic_ct_string_view`, with an enforced insert/lookup asymmetry and the non-throwing `at_if`. | Containers whose keys *provably* outlive them, yet can be looked up with any string-ish type — including `at` and `erase`, which the standard library does not make heterogeneous. See [use case 4](#use-case-4-associative-containers--case-insensitive-lookup). |
+| `<ct_str/ctsv_format_registration.hpp>` | Opt-in variable templates that synthesize `operator<<` for any type that is `std::format`- or `fmt::format`-able but not stream-insertable. | Write one `formatter` specialization and get iostreams support for free — no boilerplate `operator<<`. See [use case 7](#use-case-7-opt-in-stream-insertion-for-formattable-types). |
 
 ---
 
@@ -150,7 +237,7 @@ not be null-terminated.
 
 ## Use case 2: views that cannot dangle
 
-The `ct_cstring_view` and `ct_string_view` types document the fact that they cannot dangle; the way they are constructed guarantees it.  Only compile time constant strings with static storage duration can be bound to them.
+The `ct_cstring_view` and `ct_string_view` types document the fact that they cannot dangle; the way they are constructed guarantees it.  Only compile-time constant strings with static storage duration can be bound to them.
 
 ```c++
 auto bad() -> std::string_view {
@@ -179,13 +266,15 @@ sources of dangling views.
 even rvalue-returning expressions like `std::ranges::find("x"_ctsv, 'y')`
 do not yield `std::ranges::dangling`.)
 
-**Why is this important?**  `std::string_view` is often used for three purposes:
+**Why is this important?** `std::string_view` is often used for three purposes:
+
 1. Storing string literals as a superior alternative to `const char*`
-  * without losing size information and
-  * gaining access to (read-only) std::library string interface 
-2. As function arguments where the actual type to which the string-view is unimportant
-3. Providing O(1) non-allocating substring operations (e.g. tokenizing) 
-With #1, the string literal referred to by the `const std::string_view` will never dangle.  For ##2-3, the `std::string_view`s used are subject to dangling to the same extent that a const std::string& is subject to outliving the object to which it was bound.  The `std::string_view` type, however, provides no such guarantees.  
+   * without losing size information and
+   * gaining access to the (read-only) standard-library string interface
+2. As function arguments where the actual type to which the string-view refers is unimportant
+3. Providing O(1) non-allocating substring operations (e.g. tokenizing)
+
+With #1, the string literal referred to by the `const std::string_view` will never dangle.  For #2 and #3, the `std::string_view`s used are subject to dangling to the same extent that a `const std::string&` is subject to outliving the object to which it was bound.  The `std::string_view` type, however, provides no such guarantees.
 
 Imagine:
 
@@ -203,16 +292,19 @@ std::string david = "David";
 names_ids[david] = 4;	
 ```
 
-We have a lookup above intented to store compile-time constants string literals as keys.  In some other context, however, someone decides to add a `std::string` to the map.  There will be no explicit cast required and no warning: `std::string` implicitly converts to `std::string_view`, by design.  Obviously, the result may not turn out well.
-[Godbolt Demo](https://godbolt.org/z/h8T3soWqW) 
+We have a lookup above intended to store compile-time constant string literals as keys.  In some other context, however, someone decides to add a `std::string` to the map.  There will be no explicit cast required and no warning: `std::string` implicitly converts to `std::string_view`, by design.  Obviously, the result may not turn out well.
+
+[Godbolt Demo](https://godbolt.org/z/h8T3soWqW)
 
 If instead of `std::string_view` as a key, the map had been `std::map<ct_cstring_view, int>` (if we care about null-termination) or `std::map<ct_string_view, int>` (if null-termination is irrelevant), we would have both:
+
 1. Documented our intent that the map is designed only to hold string literals and
 2. Enforced our intent at compile-time: no runtime checks necessary, code that attempts to add something non-conforming simply will not compile
 
 ---
 
 ## Use case 3: a string as a non-type template parameter
+
 `basic_fixed_string` satisfies the structural-type rules and works directly
 as a non-type template parameter. This is the most powerful use of the
 library.
@@ -306,25 +398,33 @@ C APIs.
 ---
 
 ## Use case 4: associative containers & case-insensitive lookup
+
 ### The problem
+
 `basic_ct_string_view` makes an excellent map key: two words wide, trivially
 copyable, and its storage is statically guaranteed to outlive the container.
 But it is deliberately *strict* -- you cannot build one from a
 `std::string_view`, because that would forge the compile-time provenance and
 null-termination guarantees that make it worth having.
+
 That strictness bites at **lookup** time, and the standard library's
 heterogeneous-lookup support is conspicuously incomplete:
+
 | Operation | Heterogeneous in the standard? |
 |---|---|
 | `find`, `contains`, `count`, `lower_bound`, `equal_range` | yes (C++14 ordered / C++20 unordered) |
 | `erase(key)` | only since C++23, under awkward constraints |
 | **`at(key)`** | **no -- takes `const key_type&`, full stop** |
 | `operator[]` | no (and correctly so: it *inserts*) |
+
 So the single most-reached-for operation -- "look this string up and give me
 the value" -- was the one that did not compile.
+
 ### The fix: wrapper containers with an enforced insert/lookup asymmetry
+
 `<ct_str/ctsv_containers.hpp>` provides four class templates that encode the
 distinction in the type system:
+
 - **Inserting** (`operator[]`, `insert`, `emplace`, `try_emplace`, ...)
   requires a real `basic_ct_string_view`. Nothing else can produce a key, so
   the container can never hold a key whose storage it does not outlive.
@@ -332,6 +432,7 @@ distinction in the type system:
   `lower_bound`, ...) takes the `std::basic_string_view` **by value**. Every
   `basic_ct_string_view` (either flavor), `std::basic_string`,
   `basic_fixed_string` and string literal converts implicitly.
+
 ```c++
 #include <ct_str/ctsv_containers.hpp>
 using namespace cps::ct_string;
@@ -350,11 +451,15 @@ if (const int* p = ranks.at_if("queen"))   // non-throwing lookup
 }
 // ranks[std::string_view{"Ace"}] = 1;   // ILL-FORMED, by design.
 ```
+
 `at_if` is the non-throwing sibling of `at`: it returns a pointer to the
 mapped value or `nullptr`. It is what you usually want -- no exception, and
 no `find`/`end()` dance.
+
 ### Available containers
+
 Generic templates (every `std_char` type is supported):
+
 ```c++
 basic_ctsv_map<TChar, VALID_CSTR, TValue, TLess = ctsv_less<TChar>>
 basic_ctsv_set<TChar, VALID_CSTR, TLess = ctsv_less<TChar>>
@@ -363,34 +468,44 @@ basic_ctsv_unordered_map<TChar, VALID_CSTR, TValue,
 basic_ctsv_unordered_set<TChar, VALID_CSTR,
                          THash = ctsv_hash<TChar>, TEq = ctsv_equal_to<TChar>>
 ```
+
 Convenience aliases are spelled out for `char` and `wchar_t` in both flavors,
 case-sensitive and case-insensitive. Insert `_ci_` for the case-insensitive
 form:
+
 | Case-sensitive | Case-insensitive |
 |---|---|
 | `ct_cstring_view_set` / `ct_string_view_set` / `ct_wcstring_view_set` / `ct_wstring_view_set` | `ct_cstring_view_ci_set` / `ct_string_view_ci_set` / ... |
 | `ct_cstring_view_map<V>` / `ct_string_view_map<V>` / ... | `ct_cstring_view_ci_map<V>` / ... |
 | `ct_cstring_view_unordered_set` / ... | `ct_cstring_view_ci_unordered_set` / ... |
 | `ct_cstring_view_unordered_map<V>` / ... | `ct_cstring_view_ci_unordered_map<V>` / ... |
+
 `multimap` / `multiset` wrappers are not provided.
+
 ### Comparators and hashers
+
 `<ct_str/ctsv_comparators.hpp>` supplies the function objects, each in a
 case-sensitive and an ASCII-case-insensitive flavor, templated on the
 character type:
+
 | Case-sensitive | Case-insensitive | Result |
 |---|---|---|
 | `ctsv_less<TChar>` | `ctsv_ci_less<TChar>` | `bool` |
 | `ctsv_equal_to<TChar>` | `ctsv_ci_equal_to<TChar>` | `bool` |
 | `ctsv_three_way<TChar>` | `ctsv_ci_three_way<TChar>` | `strong_ordering` / **`weak_ordering`** |
 | `ctsv_hash<TChar>` | `ctsv_ci_hash<TChar>` | `std::size_t`, **`constexpr`** |
+
 All of them are usable standalone -- as sort predicates, projections, or in
 your own containers:
+
 ```c++
 std::vector<std::string_view> v{"delta", "Alpha", "charlie", "Bravo"};
 std::ranges::sort(v, ctsv_ci_less<char>{});     // Alpha, Bravo, charlie, delta
 static_assert(ctsv_ci_hash<char>{}("Ace") == ctsv_ci_hash<char>{}("ACE"));
 ```
+
 Three things are worth knowing:
+
 1. **The fold direction is observable.** These fold *down*. `'_'` is `0x5F`,
    between `'Z'` (`0x5A`) and `'a'` (`0x61`), so folding down makes `"Z"`
    sort *after* `"_"`. Folding up would give the opposite order. Both are
@@ -403,7 +518,9 @@ Three things are worth knowing:
    testing, so these are FNV-1a over code units. If you need the standard
    library's hash instead, pass `std::hash<basic_ct_string_view<TChar, B>>`
    explicitly -- it is transparent and pairs correctly with `std::equal_to<>`.
+
 ### ASCII only
+
 Case folding touches only `'A'`..`'Z'` / `'a'`..`'z'`. Every other code unit,
 including every code unit `>= 0x80`, passes through unchanged. This is safe
 for UTF-8/16/32 (no code unit of a non-ASCII character can be mistaken for an
@@ -411,10 +528,13 @@ ASCII letter) but it does mean `"CAFÉ"` and `"café"` do **not** compare equal.
 Full Unicode case folding needs the `CaseFolding.txt` tables and multi-code-
 point expansion (`ß` folds to `ss`, changing the length), which is a project
 of its own; see the `\todo` in `char_fold.hpp`.
+
 ### Concepts
+
 The requirements on a comparator are spelled out as concepts rather than left
 to documentation, so getting one wrong is a diagnostic rather than a silent
 fallback to homogeneous lookup:
+
 ```c++
 transparent_ctsv_less<F, TChar>        // ordered containers' Compare
 transparent_ctsv_equal_to<F, TChar>    // unordered containers' KeyEqual
@@ -422,11 +542,13 @@ transparent_ctsv_three_way<F, TChar>
 transparent_ctsv_hash<F, TChar>        // unordered containers' Hash
 consistent_ctsv_hash_equal<THash, TEq, TChar>
 ```
+
 Each requires nothrow default-constructibility, a nested `is_transparent`,
 and correct, `noexcept` behaviour over *every* pairing of
 `{cstr-flavor view, non-cstr-flavor view, std::basic_string_view}` in both
 argument orders. `std::less<>` and `std::equal_to<>` satisfy them;
 `std::less<std::string_view>` does not (it is not transparent).
+
 `consistent_ctsv_hash_equal` deserves special mention. The unordered-container
 invariant is that equal keys hash equally, and pairing a case-insensitive
 equality with a case-sensitive hash violates it *silently* -- the container
@@ -435,7 +557,9 @@ would hold both `"Ace"` and `"ACE"` while reporting them equal. The wrappers'
 declared via the `ctsv_folds_case` trait, which defaults to `false`, so types
 that know nothing about this library (`std::hash`, `std::equal_to<>`) pair
 correctly with one another.
+
 ### Migrating from the old aliases
+
 Earlier versions exposed plain alias templates
 (`basic_ct_string_view_map`, `..._unordered_set`, and the per-flavor
 spellings) in `ct_string_view.hpp`. Those are gone. The concrete alias
@@ -445,6 +569,7 @@ name the wrapper class templates, so you must include
 which no longer pulls in `<map>`/`<set>`/`<unordered_map>`/`<unordered_set>`.
 The generic `basic_ct_string_view_*` alias templates are replaced by
 `basic_ctsv_*`; `multimap`/`multiset` forms are not carried over.
+
 ---
 
 ## Use case 5: formatting
@@ -474,6 +599,83 @@ auto-detected via `__has_include` and gated on the
 
 ---
 
+## Use case 6: lazy ASCII case-folding views
+
+`<ct_str/char_fold.hpp>` provides the lowest layer of the case-insensitive
+machinery, and it is useful entirely on its own:
+
+- `ascii_to_lower<TChar>` / `ascii_to_upper<TChar>` -- `constexpr`,
+  `noexcept`, allocation-free function objects that fold a single code unit.
+  They make ideal projections for `std::ranges` algorithms.
+- `views::ascii_lower` / `views::ascii_upper` -- lazy range adaptors that
+  apply the fold across any character range. The result is a
+  `std::ranges::transform_view`: nothing is copied and no storage is
+  acquired.
+
+```c++
+#include <ct_str/char_fold.hpp>
+
+using namespace cps::ct_string;
+using namespace cps::ct_string::literals;
+
+constexpr auto shout = "hello"_ctsv;
+for (const char c : views::ascii_upper(shout)) {
+    // 'H', 'E', 'L', 'L', 'O' -- lazily, with no allocation
+}
+
+// Case-insensitive equality without allocating or copying:
+bool same = std::ranges::equal(views::ascii_lower("Hello"_ctsv),
+                               views::ascii_lower("hELLO"_ctsv));   // true
+```
+
+Because both `std::basic_string_view` and `basic_ct_string_view` are borrowed
+ranges, the adapted views never dangle when built from them. Folding is
+ASCII-only by design (see [ASCII only](#ascii-only)); every non-ASCII code
+unit passes through unchanged, which keeps the transformation safe for
+UTF-8/16/32 data.
+
+---
+
+## Use case 7: opt-in stream insertion for formattable types
+
+`<ct_str/ctsv_format_registration.hpp>` solves a general annoyance: you have
+written a `std::formatter` (or `fmt::formatter`) specialization for your
+type, and now you *also* want `operator<<` for iostreams -- more boilerplate
+that just forwards to the formatter.
+
+Instead, register the type once by specializing a variable template, and a
+constrained, ADL-found `operator<<` is synthesized for you:
+
+```c++
+#include <ct_str/ctsv_format_registration.hpp>
+
+// my_type already has a std::formatter specialization ...
+namespace cps::ct_string
+{
+    template<>
+    inline constexpr bool g_k_stream_insert_via_std_format<my_type> = true;
+}
+
+// ... and now this just works:
+std::cout << my_type{/*...*/} << '\n';
+```
+
+Four independent registration points are provided, covering narrow and wide
+streams for both formatting libraries: `g_k_stream_insert_via_std_format`,
+`g_k_stream_insert_via_fmt_format`, `g_k_wide_stream_insert_via_std_format`
+and `g_k_wide_stream_insert_via_fmt_format`.
+
+The rules are enforced by concepts rather than merely documented:
+
+- a type that is *already* stream-insertable cannot be registered (that would
+  create an ambiguity or silently switch operators), and
+- a type cannot be registered for both `std::format` and `fmt::format` at
+  once -- pick one.
+
+A worked example lives in `fmt_reg_demo.hpp` / `.cpp` in `test_console_app`.
+
+---
+
 ## The two flavors of `basic_ct_string_view`
 
 `basic_ct_string_view` is templated on a `bool VALID_CSTR` (exposed as the
@@ -495,20 +697,26 @@ either statically guaranteed to be a C-string (and you can call `c_str()`)
 or it is not (and you cannot, but you can still do anything else a
 `string_view` does, including the operations that would invalidate the
 guarantee).
---
-## Defining Static-Member or Global Constants
 
-### Usage Alternative 1: define as inline in header file as you would with a constexpr std::string_view
+---
 
-These may defined inline in header files as you would do with std::string_view global constants.
+## Defining static-member or global constants
 
-Pros: 
-    1. familiar
-    2. can use "auto"
-    3. can static assert on their value from anywhere that includes them
-    4. it is easy to see what their value is both by looking at header, and often in ide hints as well
+### Usage alternative 1: define as inline in a header file, as you would with a constexpr `std::string_view`
+
+These may be defined inline in header files as you would do with
+`std::string_view` global constants.
+
+Pros:
+
+1. familiar
+2. can use `auto`
+3. can `static_assert` on their value from anywhere that includes them
+4. it is easy to see what their value is both by looking at the header, and often in IDE hints as well
+
 Cons:
-    1. there is greater instantiation cost for defining a ct_cstring_view than there is for defining a std::string_view
+
+1. there is greater instantiation cost for defining a `ct_cstring_view` than there is for defining a `std::string_view`
 
 If the number of instantiations is large in a widely included header and noticeable delay is added, 
 consider alternative 2.
@@ -602,7 +810,7 @@ R"(     THIS is the forest primeval. The murmuring pines and the hemlocks,
 }
 #endif //CSTR_VIEW_HEADER_ONLY_VIEWS_HPP
 ```
-### Usage Alternative 2: declare in header, define in .cpp file with constinit.
+### Usage alternative 2: declare in header, define in .cpp file with `constinit`
 
 If you decide that a large, widely-included header file is slowing down compilation noticeably, you can declare the variables in the header but define them with constinit in the translation unit.  Note that constinit will only be applied in the definition, not in the header. Also, constinit does *NOT* imply const.  We want these to be global constants (presumably) so ensure they are marked const both at declaration and definition.  We are using constinit here **not** to have mutable views, but solely to segregate header declaration from translation unit definition. 
 
