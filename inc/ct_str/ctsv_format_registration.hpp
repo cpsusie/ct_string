@@ -69,11 +69,18 @@ namespace cps::ct_string
 
     template<typename>
     concept std_wide_formattable = false;
+    // Unreachable fallbacks. The concepts above are hard-false without the
+    // library, so the proxy specializations that expand these macros have no
+    // satisfiable argument. They must nonetheless PARSE as a `return` of
+    // string_type: that type is non-dependent, so Clang rejects the template
+    // definition outright ([temp.res]/8 -- a template for which no valid
+    // specialization can be generated is ill-formed), whereas MSVC only
+    // diagnoses on instantiation. Hence `string_type{}`, not `(void)`.
 #   ifndef CPS_CTSV_STRING_VIEW_STD_NARROW_FUNC
-        #define CPS_CTSV_STRING_VIEW_STD_NARROW_FUNC(v) ((void)(v))
+        #define CPS_CTSV_STRING_VIEW_STD_NARROW_FUNC(v) (static_cast<void>(v), string_type{})
 #   endif
 #   ifndef CPS_CTSV_STRING_VIEW_STD_WIDE_FUNC
-        #define CPS_CTSV_STRING_VIEW_STD_NARROW_FUNC(v) ((void)(v))
+        #define CPS_CTSV_STRING_VIEW_STD_WIDE_FUNC(v) (static_cast<void>(v), string_type{})
 #   endif
 #endif
 #if defined(CPS_CT_STRING_VIEW_HAS_FMT) && (CPS_CT_STRING_VIEW_HAS_FMT == 1)
@@ -90,7 +97,7 @@ namespace cps::ct_string
     template<typename>
     concept fmt_formattable = false;
 #   ifndef CPS_CTSV_STRING_VIEW_FMT_NARROW_FUNC
-        #define CPS_CTSV_STRING_VIEW_FMT_NARROW_FUNC(v) ((void)(v))
+        #define CPS_CTSV_STRING_VIEW_FMT_NARROW_FUNC(v) (static_cast<void>(v), string_type{})
 #    endif
 #endif
 
@@ -110,7 +117,7 @@ namespace cps::ct_string
     concept fmt_wide_formattable = false;
 
 #   ifndef CPS_CTSV_STRING_VIEW_FMT_WIDE_FUNC
-    #define CPS_CTSV_STRING_VIEW_FMT_WIDE_FUNC(v) ((void)(v))
+    #define CPS_CTSV_STRING_VIEW_FMT_WIDE_FUNC(v) (static_cast<void>(v), string_type{})
 #   endif
 
 #endif
