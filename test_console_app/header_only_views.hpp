@@ -63,7 +63,7 @@ R"(     THIS is the forest primeval. The murmuring pines and the hemlocks,
 
 
     // you can static assert on their value globally if this is done in a header
-    static_assert(g_k_padded_evangeline.known_cstr);
+    static_assert(decltype(g_k_padded_evangeline)::known_cstr);
     static_assert(char{} == g_k_padded_evangeline.c_str()[g_k_padded_evangeline.size()]);
     static_assert(has_c_str<decltype(g_k_padded_evangeline)>);
 
