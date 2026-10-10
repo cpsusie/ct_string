@@ -13,7 +13,9 @@
 - **Tests:**
   - a GoogleTest suite in `tests/`, with 156 tests that currently run (see F-4);
   - a C++20-pinned smoke translation unit, `tests/cxx20_header_smoke.cpp`;
-  - a C++23 demo program, `test_console_app/`.
+  - a C++23 demo program, `test_console_app/`. It also checks itself, in `main.cpp`:
+    `static_assert`s (lines 291–316), runtime `assert`s that are active only in builds without
+    `NDEBUG` (lines 273–276), and a non-zero exit code on failure (lines 325 and 333).
 - **Build.** A single `CMakeLists.txt`:
   - `cmake_minimum_required(VERSION 4.0.2)` and `project(cstr_view VERSION 1.0.0)`.
   - INTERFACE target `cstr_view` (`cxx_std_20`).
@@ -162,8 +164,8 @@ also works today, but that is not promised (decision D-008).
 | `ubuntu-22.04` | Ubuntu 22.04 | 10.5, 11.4, 12.3 | 13, 14, 15 | — | 3.31.6 | Ninja 1.13, vcpkg, Docker |
 | `ubuntu-24.04` (= `ubuntu-latest`) | Ubuntu 24.04 | 12.4, 13.3, 14.2 | 16, 17, 18 | — | 3.31.6 | The Ubuntu archive also offers `clang-19`/`clang-20` (with libc++) and `g++-11` |
 | `ubuntu-26.04` | Ubuntu 26.04 | 13.4, 14.3, 15.2 | 20.1, 21.1, 22.1 | — | 4.4.3 | |
-| `windows-2022` | Server 2022 | — | LLVM 20.1.8; VS-bundled clang-cl | VS 2022 17.14 (MSVC 14.44, v143). Whether the v142 x64 toolset is installed is not yet verified. | 3.31.6 | vcpkg, Ninja |
-| `windows-2025-vs2026` (= `windows-latest`, `windows-2025`) | Server 2025 | — | LLVM 20.1.8; VS-bundled clang-cl | VS 2026 18.10 (MSVC 14.5x, v145), plus MSVC 14.44 side by side | 4.4.3 | vcpkg, Ninja |
+| `windows-2022` | Server 2022 | — | LLVM 20.1.8; VS-bundled clang-cl | VS 2022 17.14 (MSVC 14.44, v143). The x64 v142 toolset is **not** installed: only its ARM, ARM64 and UWP parts are. Older toolsets can be added during a job (F-13). | 3.31.6 | vcpkg, Ninja |
+| `windows-2025-vs2026` (= `windows-latest`, `windows-2025`) | Server 2025 | — | LLVM 20.1.8; VS-bundled clang-cl | VS 2026 18.10 (MSVC 14.5x, v145), plus MSVC 14.44 side by side. No x64 v142. | 4.4.3 | vcpkg, Ninja |
 | `macos-15`, `macos-26` (= `macos-latest`) | macOS, arm64 | — | AppleClang (Xcode) | — | — | Relevant only if macOS is in scope (Q-07) |
 
 - Arm64 Linux and Windows runners also exist (`ubuntu-24.04-arm`, `windows-11-arm`).
@@ -174,17 +176,24 @@ also works today, but that is not promised (decision D-008).
 
 From `stl/inc/yvals_core.h` at the `microsoft/STL` release tags:
 
-| STL version | Requires Clang | Requires MSVC |
+| STL version (toolset) | Requires Clang | Requires MSVC |
 |---|---|---|
-| VS 2022 17.10 | ≥ 17 | ≥ 19.40 |
-| VS 2022 17.14 | ≥ 19 | ≥ 19.44 |
+| VS 2022 17.10 (14.40) | ≥ 17 | ≥ 19.40 |
+| VS 2022 17.11 (14.41) | ≥ 17 | ≥ 19.40 |
+| VS 2022 17.12 (14.42) | ≥ 17 | ≥ 19.41 |
+| VS 2022 17.13 (14.43) | ≥ 18 | ≥ 19.42 |
+| VS 2022 17.14 (14.44) | ≥ 19 | ≥ 19.44 |
 | `main` (next VS 2026 update) | ≥ 22 | ≥ 19.52 |
 
 **Implication.**
-- With clang-cl, the floor comes from the MSVC STL in use. The library's own Clang 17 floor only
-  matters with older STLs.
-- The practical clang-cl matrix is therefore the clang-cl bundled with each supported Visual Studio,
-  plus the standalone LLVM on the runner (decision D-010).
+- With clang-cl, the minimum Clang comes from the MSVC STL in use, as well as from the library.
+- The library's own floor, Clang 17, can still be tested on Windows: pair it with an STL that
+  accepts it (14.42 at the newest). Clang 18 pairs with 14.43, and Clang 19 or later with 14.44.
+- Official LLVM Windows installers exist for every release from 17 on. LLVM 17.0.6 and 18.1.8 were
+  checked on the `llvm/llvm-project` releases page. Older toolsets can be installed side by side
+  (F-13).
+- So clang-cl can be tested from the library's floor upwards: one job per Clang major, each with an
+  STL that accepts it, plus the clang-cl bundled with Visual Studio (decision D-010).
 
 ## F-10 Registry rules that shape the design
 
@@ -215,3 +224,44 @@ therefore gets in-repo vcpkg and Conan configurations instead (decision D-022, q
   `fixed-string` is taken by an unrelated project.
 - **ConanCenter.** `ct_string`, `ctstring`, `cstr_view`, `fixed_string` and `cps_ct_string` are
   free.
+
+## F-12 Branches, and the GitHub rules that shape CI (checked 2026-10-10)
+
+**Branches:**
+- `main` is the default branch and the only protected one. `develop` points at the same commit.
+- `main` is an ancestor of `develop-release_1`, which is two commits ahead (LEGENDUM and the
+  brief). Merging `develop-release_1` into `main` is therefore a fast-forward today, as long as
+  nothing else lands on `main`.
+- `develop-handeval` has one work-in-progress commit that is on no other branch. This plan does not
+  touch it.
+- No branch has a `.github/` directory yet.
+
+**What works only from the default branch** (GitHub documentation):
+- Push and pull-request runs use the workflow file in the commit being tested. CI therefore works
+  on `develop-release_1` and its PRs as soon as the workflow is merged there.
+- Scheduled runs use only the workflow files on the default branch, and they test that branch.
+- The manual "Run workflow" button (`workflow_dispatch`) appears only for workflow files on the
+  default branch.
+- Dependabot reads its configuration only from the default branch. Its `target-branch` setting can
+  send version updates to another branch, but security updates always target the default branch.
+- PR and issue templates take effect only from the default branch.
+
+**Required checks and rulesets** (GitHub documentation):
+- A required check passes if it is successful, skipped or neutral, and a skipped job reports
+  success. So a job that is skipped because an earlier job failed would not block a merge.
+- A ruleset can restrict the merge methods allowed on its branches.
+- Branch protection rules and rulesets can stop "Automatically delete head branches" from deleting
+  a protected branch, for example `develop-release_1` after it is merged into `main`.
+
+## F-13 MSVC toolsets that can be installed side by side (checked 2026-10-10)
+
+- The Visual Studio 2022 installer offers every x64 MSVC toolset from **14.29** (VS 2019 16.11,
+  the v142 toolset) through **14.44** (VS 2022 17.14) as a separate component, one per VS 2022
+  minor version: 16 toolsets in all.
+- The runner images preinstall only the newest x64 toolset of each Visual Studio (F-8). A job can
+  add any of the others with the Visual Studio installer before building. T7 measures how long that
+  takes.
+- Each toolset brings its own MSVC STL. That is what lets a clang-cl job pair an older Clang with an
+  STL that accepts it (F-9).
+- Sources: the Visual Studio 2022 Build Tools component list in `MicrosoftDocs/visualstudio-docs`,
+  and the Visual Studio component tables in the `actions/runner-images` software lists.

@@ -9,7 +9,8 @@ questions.
   when the task in its "Needed by" column starts, Copilot asks again in that task's PR before
   relying on the default.
 - **Where answers go.** Copilot records each answer below and updates the matching decision in
-  [DECISIONS.md](DECISIONS.md) in the next PR.
+  [DECISIONS.md](DECISIONS.md). Answers given while you review this PR (T1) are recorded in the T2
+  PR, so T1 can be merged while questions are still open.
 - **None of these blocks the next task (T2).**
 
 ## Summary
@@ -21,21 +22,22 @@ questions.
 | Q-03 | Version of the first public release | T14 | `1.0.0`, preceded by a `v1.0.0-rc.1` pre-release that dry-runs the release pipeline |
 | Q-04 | GCC floor to advertise | T6 | GCC 11.1 (tested); 10.x is impossible |
 | Q-05 | Clang floor | T6 | Clang 17, no workarounds |
-| Q-06 | MSVC v142 (VS 2019 16.11) | T7 | Test it if the runner can provide it; drop it if it needs non-trivial workarounds |
+| Q-06 | MSVC toolsets to test | T7 | Every toolset from 14.29 (VS 2019 16.11) to the newest, on every PR; you decide before any is dropped |
 | Q-07 | macOS / AppleClang | T8 | Yes: after the libc++ fix, add a macOS arm64 job |
 | Q-08 | Meaning of "separate test-suite packages" | T10 | In-repo vcpkg manifest and Conan recipe for the test suite; not published to the registries |
 | Q-09 | CMake minimum | T4 | 3.21 minimum, newest tested 4.x as the policy maximum |
 | Q-10 | fmt opt-in/opt-out | T11 | Keep auto-detection by default; add a force on/off switch; package managers default to off |
-| Q-11 | Release and branch flow | T15 | `develop-release_1` → PR into `main` → you push tag `vX.Y.Z` → workflow publishes |
+| Q-11 | Release and branch flow | T15 | You promote `develop-release_1` into `main` (merge commit) and push tag `vX.Y.Z` there → workflow publishes; pre-release tags go on `develop-release_1` |
 | Q-12 | Who submits to vcpkg and ConanCenter | T19 | You, using files and steps Copilot prepares |
 | Q-13 | Which new documents need Latin | T14 | Only README and LEGENDUM are bilingual; everything else is English |
 | Q-14 | Code formatter (clang-format) | T5 | Not before 1.0; revisit afterwards |
-| Q-15 | Role of `test_console_app` | T10 | It is a demo: move it to `examples/`, behind an option, and build it in CI |
-| Q-16 | GitHub repository settings | T5 | Rulesets on `develop-release_1` and `main`; squash merge; delete merged branches |
-| Q-17 | CI budget and Docker Hub | T6 | Full matrix on every PR and push; anonymous pulls of the official `gcc` images |
+| Q-15 | Role of `test_console_app` | T10 | A demo that checks itself: move it to `examples/`, behind an option; CI builds and runs it |
+| Q-16 | GitHub repository settings | T5 | Rulesets on `develop-release_1` and `main` requiring the one `ci-ok` check; squash for task PRs, merge commit for promotions; delete merged branches |
+| Q-17 | CI budget and Docker Hub | T6 | Full matrix (about 50 jobs) on every PR and push; anonymous pulls of the official `gcc` images |
 | Q-18 | CPU architectures | T6 | x64 everywhere, plus one Linux arm64 job (GCC 14, full suite) |
 | Q-19 | Community files and documentation hosting | T17 | Add CONTRIBUTING and SECURITY files and issue templates; no separate docs site |
 | Q-20 | Visual Studio flags for the C++23 suite | T7 | "/cpplang" means `/std:c++latest`; VS 2026 required, VS 2022 17.14 best-effort |
+| Q-21 | Default branch during the project | T5 | Make `develop-release_1` the default branch from T5 until the release, so weekly and manual runs, Dependabot and the PR template work |
 
 ---
 
@@ -102,15 +104,22 @@ questions.
   - (c) Earlier versions. Not recommended, because it conflicts with the modern style.
 - **Answer:** _pending_
 
-### Q-06 MSVC v142 (VS 2019 16.11, MSVC 14.29)
+### Q-06 Which MSVC toolsets to test
 - **Context.**
-  - v142 is the first MSVC that is complete for `/std:c++20`.
+  - The brief asks CI to enforce every MSVC that fully or nearly fully supports C++20. That is v142
+    14.29 (VS 2019 16.11), the first MSVC complete for `/std:c++20`, and every later toolset:
+    14.30–14.44 (VS 2022) and 14.5x (VS 2026).
+  - The runners preinstall only 14.44 and 14.5x. The other 15 toolsets, including v142, can be
+    installed side by side during a job (FINDINGS F-13). That costs some minutes per job, which T7
+    measures.
   - VS 2019 is out of mainstream support.
-  - GitHub's Windows images may offer v142 only as a side-by-side toolset, which T7 will verify.
 - **Options:**
-  - (a) Test v142 if it is available. Keep it if it passes; if it needs non-trivial workarounds,
-    come back to you before dropping it. *(Recommended.)*
-  - (b) Support VS 2022 (v143) and later only.
+  - (a) **Recommended.** Test every toolset from 14.29 to the newest, on every PR. If a toolset
+    needs non-trivial workarounds, Copilot comes back to you before dropping it.
+  - (b) PRs test 14.29, 14.44 and 14.5x. The full sweep runs after every merge and weekly. PR runs
+    are faster, but a problem with a toolset in between is found just after merging, not before.
+  - (c) VS 2022 (v143) and later, newest version of each Visual Studio only. Cheapest, but it does
+    not meet the brief's "any version".
 - **Answer:** _pending_
 
 ### Q-07 macOS / AppleClang in scope?
@@ -162,13 +171,19 @@ questions.
 - **Answer:** _pending_
 
 ### Q-11 Release and branch flow
+- **Context.** Copilot's PRs always target `develop-release_1` (D-003), but releases come from
+  `main`.
 - **Recommendation:**
   1. Work accumulates on `develop-release_1`.
-  2. A release PR merges `develop-release_1` into `main`.
-  3. You push an annotated tag `vX.Y.Z` on `main`.
-  4. The release workflow builds and verifies the release, then creates the GitHub Release with
+  2. A release-preparation PR into `develop-release_1` finalises the version and the CHANGELOG.
+  3. You promote: a PR from `develop-release_1` into `main`, merged with a merge commit (not
+     squashed), so the two branches keep a shared history. It is the only kind of PR into `main`.
+  4. You push an annotated tag `vX.Y.Z` on `main`.
+  5. The release workflow builds and verifies the release, then creates the GitHub Release with
      notes and checksums.
-  5. After 1.0.0, the next cycle uses a new branch (for example `develop-release_2`) or keeps
+  6. Pre-release tags, such as the `v1.0.0-rc.1` dry run (T15), go on `develop-release_1`. They
+     need no promotion.
+  7. After 1.0.0, the next cycle uses a new branch (for example `develop-release_2`) or keeps
      `develop-release_1`. Your choice. CI picks up either name automatically after T16.
 - **Answer:** _pending_
 
@@ -199,32 +214,40 @@ questions.
 - **Answer:** _pending_
 
 ### Q-15 Role of `test_console_app`
-- **Context.** It is a C++23 program using `std::expected` and fmt. It demonstrates the library but
-  has no assertions.
+- **Context.** It is a C++23 program using `std::expected` and fmt. It demonstrates the library, and
+  it also checks itself (FINDINGS F-1):
+  - `static_assert`s (`main.cpp` lines 291–316);
+  - runtime `assert`s, active only in builds without `NDEBUG` (lines 273–276);
+  - a non-zero exit code on failure (lines 325 and 333).
 - **Options:**
   - (a) Move it to `examples/console_app/`, build it when `CT_STRING_BUILD_EXAMPLES` is on, and have
-    the C++23 CI jobs build it. *(Recommended.)*
-  - (b) Keep it where it is, built together with the tests.
-  - (c) Remove it.
+    the C++23 CI jobs build **and run** it, including a Debug build so its `assert`s are active.
+    *(Recommended.)*
+  - (b) As (a), but also move its checks into the test suite, so they run wherever the suite runs.
+  - (c) Keep it where it is, built together with the tests.
+  - (d) Remove it. Its checks would be lost unless they move into the suite first.
 - **Answer:** _pending_
 
 ### Q-16 GitHub repository settings (you apply these; T5 includes click-by-click steps)
 - **Recommendation:**
   - A branch ruleset on `develop-release_1` and `main` that:
     - requires a PR;
-    - requires the CI status checks;
+    - requires the single status check `ci-ok`, the CI gate job (D-013);
     - requires branches to be up to date;
     - blocks force pushes and deletion.
-  - Merge method: squash.
-  - Turn on "Automatically delete head branches".
+  - Merge methods: squash for task PRs into `develop-release_1`; a merge commit for promotions into
+    `main` (D-003). A ruleset can enforce each.
+  - Turn on "Automatically delete head branches". The deletion block keeps `develop-release_1`
+    after a promotion (FINDINGS F-12).
   - Use the merge queue if GitHub offers it for this repository.
 - **Answer:** _pending_
 
 ### Q-17 CI budget and Docker Hub
 - **Context.**
   - Hosted-runner minutes are free for public repositories.
-  - The finished matrix will have an estimated 30–35 jobs, run in parallel, taking roughly 10–15
-    minutes of wall time.
+  - The finished matrix will have an estimated 50 jobs, more than 20 of them on Windows because
+    every MSVC toolset is tested (Q-06). GitHub Free runs up to 20 jobs at once, so a full run is
+    estimated at 20–30 minutes of wall time. T7 measures it.
   - The GCC floor job pulls the official `gcc:11.1` image from Docker Hub, which rate-limits
     anonymous pulls.
 - **Recommendation.**
@@ -255,4 +278,23 @@ questions.
   - Read that as `/std:c++latest`, which is what CMake uses for C++23 on MSVC.
   - The suite must pass on VS 2026 (MSVC and clang-cl).
   - Run it on VS 2022 17.14 too, for as long as it passes there.
+- **Answer:** _pending_
+
+### Q-21 Default branch during the project
+- **Context.**
+  - `main` is the default branch. GitHub reads some files only from the default branch: the weekly
+    scheduled run, the manual "Run workflow" button, Dependabot's configuration, and PR and issue
+    templates (FINDINGS F-12).
+  - All work lands on `develop-release_1`. Its push and PR runs work as soon as T5 merges, but
+    nothing reaches `main` before the release.
+- **Options:**
+  - (a) **Recommended.** When T5 merges, make `develop-release_1` the default branch, and make
+    `main` the default again at the release (T18). Every feature works from T5 on, and GitHub
+    proposes `develop-release_1` as the base of new PRs. Until the release, visitors and fresh
+    clones see `develop-release_1`.
+  - (b) Keep `main` as the default, and promote `develop-release_1` into it early, after T5 and
+    again whenever the workflow, Dependabot or template files change. `main` then carries
+    unreleased work.
+  - (c) Keep `main` as the default, and accept that the features above start only at the release.
+    PR and push CI still runs from T5.
 - **Answer:** _pending_

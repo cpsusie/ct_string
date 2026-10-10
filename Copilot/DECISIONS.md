@@ -56,7 +56,7 @@ reused, so they may appear out of numeric order.
 - **Alternative:** Detail every task now. That is brittle and creates rework.
 
 ### D-003 Branch and PR workflow
-- **Date:** 2026-10-10. **Status:** Proposed. **Related:** all tasks, Q-16.
+- **Date:** 2026-10-10. **Status:** Proposed. **Related:** all tasks, D-026, Q-11, Q-16.
 - **Decision:**
   - Every task branches from the latest `develop-release_1`, and its PR targets `develop-release_1`.
   - One PR is open at a time.
@@ -64,9 +64,17 @@ reused, so they may appear out of numeric order.
   - Branch names follow `copilot/<task>-<slug>` where the tooling allows.
   - Each PR is a single topic and stays small; split it if it grows past about 400 changed lines of
     code.
-- **Why:** These are the brief's work rules. Small PRs are easier to review and to learn from.
-- **Note:** Squash merging is recommended to keep the history linear (Q-16). The choice is yours,
-  since you merge.
+  - **The one exception is promotion into `main`** (D-026). It is a PR from `develop-release_1`
+    itself into `main`, opened and merged by you. It contains nothing you have not already
+    approved.
+- **Why:**
+  - These are the brief's work rules. Small PRs are easier to review and to learn from.
+  - A release needs the code on `main`, and promotion gets it there without Copilot ever targeting
+    another branch.
+- **Note:** Squash merging is recommended for task PRs, to keep the history linear (Q-16).
+  Promotion PRs need a merge commit instead. A squashed promotion would give `main` and
+  `develop-release_1` different histories, and every later promotion would conflict. The choice is
+  yours, since you merge.
 
 ### D-004 The Task 1 PR changes documentation only, and README/LEGENDUM stay unchanged
 - **Date:** 2026-10-10. **Status:** Proposed. **Related:** T1, D-025.
@@ -135,41 +143,54 @@ reused, so they may appear out of numeric order.
 - **Decision:**
   - CI runs the full suite and the demo on GCC 14 and 15.
   - Also on Clang 19, 20, 21 and 22 with libstdc++.
-  - Also on the newest MSVC (VS 2026) and the newest clang-cl.
+  - Also on the newest MSVC (VS 2026) and the clang-cl bundled with VS 2026.
   - The suite is also run on VS 2022 17.14 for as long as it passes there; that is a goal, not a
     promise.
   - GCC 13 currently passes too, but is not promised.
 - **Why:** These are the brief's stated floors, confirmed by the probe (F-3). Promising less than
   what happens to work keeps the test project free to use newer C++23 features.
 
-### D-009 MSVC: test the oldest C++20-complete toolset and the newest of each Visual Studio
-- **Date:** 2026-10-10. **Status:** Pending Q-06 (v142). **Related:** T7, F-8.
+### D-009 MSVC: test every toolset from 14.29 (VS 2019 16.11) to the newest
+- **Date:** 2026-10-10. **Status:** Pending Q-06. **Related:** T7, F-8, F-13.
 - **Context:**
   - The brief asks CI to enforce every MSVC that fully or nearly fully supports C++20.
-  - That is VS 2019 16.11 (MSVC 14.29, v142) and later.
-  - GitHub's runners offer VS 2022 17.14 (14.44) and VS 2026 (14.5x).
-  - v142 is only available as a side-by-side toolset, and whether it is installed is unverified.
+  - That is VS 2019 16.11 (MSVC 14.29, v142) and every later toolset: 14.30–14.44 (VS 2022) and
+    14.5x (VS 2026).
+  - The runners preinstall only 14.44 and 14.5x. Every toolset from 14.29 to 14.43 can be installed
+    side by side during a job (F-13).
 - **Decision (default):**
-  - C++20 smoke checks on **14.29 (v142), if it can be installed and it compiles**, plus **14.44
-    (v143, VS 2022 17.14)** and **14.5x (v145, VS 2026)**.
-  - VS 2022 minor versions in between (14.30–14.43) are not tested individually.
-  - If v142 needs non-trivial workarounds, you decide whether to drop it. The floor would then be
-    v143, recorded as a new decision.
+  - Build the C++20 smoke check with **every** toolset: 14.29, each VS 2022 minor version from 14.30
+    to 14.44, and VS 2026's 14.5x. Later VS 2026 versions join as they ship.
+  - These jobs run on every PR and push, and the required check covers them (D-013).
+  - T7 measures the cost. If the sweep makes PR runs much slower, T7's PR offers Q-06 option (b)
+    instead, and you choose.
+  - If a toolset needs non-trivial workarounds, you decide whether to drop it. That is recorded as a
+    new decision.
 - **Why:**
-  - Testing the floor plus the newest of each major version is the usual cost/coverage balance.
-  - Intermediate toolsets are not preinstalled. Installing each one costs CI time and adds
-    fragility.
+  - Only a full sweep makes "enforced by CI" true for every version the brief covers. Testing just
+    the oldest and the newest would leave 14 toolsets (14.30–14.43) unverified.
+  - The side-by-side components make it possible on hosted runners, and minutes are free for public
+    repositories.
+- **Alternatives:** The oldest toolset plus the newest of each Visual Studio, or a sample of the
+  versions in between. Both are cheaper, but leave toolsets the brief covers untested.
 
-### D-010 clang-cl: Visual Studio's bundled clang-cl for each supported VS, plus standalone LLVM
-- **Date:** 2026-10-10. **Status:** Proposed. **Related:** T7, F-9.
+### D-010 clang-cl: every Clang major from the library's floor, each with an STL that accepts it
+- **Date:** 2026-10-10. **Status:** Proposed. **Related:** T7, F-9, F-13.
 - **Decision:**
-  - CI builds the C++20 smoke with the clang-cl bundled with VS 2022 17.14 and with VS 2026, and
-    with the runner's standalone LLVM clang-cl.
-  - The full suite runs with the newest of these.
+  - CI builds the C++20 smoke check with clang-cl:
+    - **Clang 17**, the library's floor (official LLVM release), with the 14.42 toolset's STL;
+    - **Clang 18** (official LLVM release), with the 14.43 STL;
+    - the clang-cl **bundled** with VS 2022 17.14 (14.44 STL) and with VS 2026 (14.5x STL);
+    - the runner's **standalone** LLVM (20 today), which picks up newer majors as the images
+      update.
+  - The full suite runs with the clang-cl bundled with VS 2026.
 - **Why:**
-  - The MSVC STL hard-codes a minimum Clang: 19 for VS 2022 17.14, and newer for later releases.
-  - So with clang-cl the floor follows the STL, not the library.
+  - The brief asks for the same coverage as MSVC.
+  - The MSVC STL sets its own minimum Clang (F-9). Pairing each Clang with an STL that accepts it
+    tests the library's own floor on Windows too.
   - The bundled clang-cl is exactly what Visual Studio users get.
+- **Alternative:** Only the clang-cl bundled with each Visual Studio. Cheaper, but Clang 17 and 18
+  would go untested on Windows.
 
 ### D-024 libc++ incompatibility is a bug, fixed whatever the macOS scope
 - **Date:** 2026-10-10. **Status:** Proposed. **Related:** T3, T8, F-5, Q-07.
@@ -192,7 +213,8 @@ reused, so they may appear out of numeric order.
 - **Decision:**
   - Use GitHub Actions on GitHub-hosted runners.
   - Name images explicitly (`ubuntu-24.04`, `windows-2022`, …), never `*-latest`.
-  - Add a weekly scheduled run.
+  - Add a weekly scheduled run. It works only once the workflow is on the default branch (F-12,
+    D-028).
   - Print every toolchain's version in the job log.
 - **Why:**
   - Hosted runners are free for public repositories and need no maintenance.
@@ -213,25 +235,54 @@ reused, so they may appear out of numeric order.
 - **Why:** GitHub's hardening guidance. Pinning to a SHA guards against a compromised or
   re-pointed tag. Least privilege limits the damage if something does go wrong.
 
-### D-013 PRs are tested as they will be merged
-- **Date:** 2026-10-10. **Status:** Proposed. **Related:** T5, Q-16.
+### D-013 PRs are tested as they will be merged, behind one required check
+- **Date:** 2026-10-10. **Status:** Proposed. **Related:** T5, Q-16, F-12.
 - **Decision:**
   - CI runs on the `pull_request` event, which builds GitHub's merge commit of the PR into its base
     branch.
-  - You add a ruleset that requires the CI checks and requires the branch to be up to date before
-    merging. The merge queue can be used if it is available for this repository.
+  - A final gate job, `ci-ok`, depends on every other job. It always runs, and it fails unless all
+    of them succeeded.
+  - You add a ruleset that requires `ci-ok` as the only status check, and requires the branch to be
+    up to date before merging. The merge queue can be used if it is available for this repository.
 - **Why:**
   - This is exactly the brief's "run as they would be merged with the base branch".
   - The up-to-date rule closes the gap when the base branch moves after CI has run.
+  - A skipped job counts as passing (F-12). Without the gate, a job skipped because another job
+    failed could let a broken PR through.
+  - With one required check, adding or renaming matrix jobs never needs a ruleset change.
 
 ### D-014 Trigger scope grows in two phases
-- **Date:** 2026-10-10. **Status:** Proposed. **Related:** T5, T16.
+- **Date:** 2026-10-10. **Status:** Proposed. **Related:** T5, T16, D-028.
 - **Decision:**
   - **Phase 1 (T5).** Pushes to, and PRs into, `develop-release_1` and `main`, plus manual and
-    weekly runs.
+    weekly runs. Manual and weekly runs need the workflow on the default branch (D-028).
   - **Phase 2 (T16).** Add every branch whose name contains `develop` or `release`, using the
     `**develop**` and `**release**` patterns.
 - **Why:** This is the brief's ordering, and phase 2 is a tiny, separately reviewable change.
+
+### D-028 Make `develop-release_1` the default branch until the release
+- **Date:** 2026-10-10. **Status:** Pending Q-21. **Related:** T5, T18, F-12, D-014.
+- **Context:**
+  - The weekly run, the manual "Run workflow" button, Dependabot and the PR template work only
+    from files on the default branch, which is `main` (F-12).
+  - All work lands on `develop-release_1`, so none of them would work before the release.
+- **Decision (default):**
+  - You make `develop-release_1` the default branch when T5 merges, and make `main` the default
+    again at the release (T18). It is a repository setting, not a code change.
+  - Dependabot's version updates name `develop-release_1` as their target, so they keep landing
+    there after the switch back.
+  - T5's PR shows which of these features work, and how it was checked.
+- **Why:**
+  - Every feature works from T5 on, on the branch where the work happens.
+  - GitHub then also proposes `develop-release_1` as the base of new PRs, as the brief's rules
+    require.
+  - `main` stays unchanged until the release.
+- **Cost:** Until the release, visitors to the repository and fresh clones see `develop-release_1`.
+- **Alternatives:**
+  - Promote `develop-release_1` into `main` early, after T5. `main` then carries unreleased work,
+    and every later workflow change needs another promotion.
+  - Wait for the release. Until then there are no weekly or manual runs, and Dependabot and the PR
+    template do nothing.
 
 ### D-015 Toolchains are obtained in a fixed order of preference
 - **Date:** 2026-10-10. **Status:** Proposed. **Related:** T6–T8.
@@ -352,20 +403,25 @@ reused, so they may appear out of numeric order.
   slow every PR without helping users.
 
 ### D-026 Versioning and release flow
-- **Date:** 2026-10-10. **Status:** Pending Q-03 and Q-11. **Related:** T14, T15, T18.
+- **Date:** 2026-10-10. **Status:** Pending Q-03 and Q-11. **Related:** T14, T15, T18, D-003.
 - **Decision (default):**
   - Semantic Versioning 2.0.0.
   - Annotated tags `vMAJOR.MINOR.PATCH`.
   - CHANGELOG.md in the Keep a Changelog format.
-  - Releases come from `main`: a release PR from `develop-release_1` into `main`, then a tag, then
-    a workflow that creates the GitHub Release with checksums.
+  - Releases come from `main`:
+    1. A release-preparation PR into `develop-release_1` finalises the version and the CHANGELOG.
+    2. You promote `develop-release_1` into `main`: a PR merged with a merge commit (D-003).
+    3. You push the tag on `main`.
+    4. A workflow creates the GitHub Release with checksums.
   - The version is held in one source of truth, which CI checks against every place that repeats
     it.
-  - A pre-release tag (for example `v1.0.0-rc.1`) dry-runs the pipeline before 1.0.0.
+  - A pre-release tag (for example `v1.0.0-rc.1`) dry-runs the pipeline before 1.0.0. You push it
+    on `develop-release_1`, so no promotion is needed for it.
 - **Why:**
   - Registries reference immutable tags and checksums.
   - SemVer tells users which upgrades are safe.
   - The dry run catches pipeline mistakes before they become a public release.
+  - Copilot's PRs keep targeting `develop-release_1`. Only you change `main`.
 
 ### D-027 You submit to the central registries, using material Copilot prepares
 - **Date:** 2026-10-10. **Status:** Pending Q-12. **Related:** T19, T20.
@@ -374,6 +430,11 @@ reused, so they may appear out of numeric order.
     instructions.
   - You fork `microsoft/vcpkg` and `conan-io/conan-center-index`, open the PRs, sign the
     ConanCenter CLA and answer reviewers.
+  - Copilot's preparation for each registry is a normal task PR into `develop-release_1`. The
+    upstream PRs live in other repositories, so the "one PR at a time" rule (D-003) does not apply
+    to them: the two upstream reviews can run in parallel.
+  - A submission task is done when its upstream PR is merged, or when you decide to close it,
+    recorded as a decision with the reason.
 - **Why:**
   - Copilot can only push to this repository.
   - The registries expect the upstream maintainer to own the submission.
