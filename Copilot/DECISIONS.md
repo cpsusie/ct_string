@@ -59,7 +59,8 @@ reused, so they may appear out of numeric order.
 - **Date:** 2026-10-10. **Status:** Proposed. **Related:** all tasks, D-026, Q-11, Q-16.
 - **Decision:**
   - Every task branches from the latest `develop-release_1`, and its PR targets `develop-release_1`.
-  - One PR is open at a time.
+  - One Copilot task PR is open at a time. Your promotion PRs and Dependabot's PRs are outside this
+    rule.
   - You review, approve and merge. Task *n* starts only after task *n-1* is merged.
   - Branch names follow `copilot/<task>-<slug>` where the tooling allows.
   - Each PR is a single topic and stays small; split it if it grows past about 400 changed lines of
@@ -175,21 +176,25 @@ reused, so they may appear out of numeric order.
   versions in between. Both are cheaper, but leave toolsets the brief covers untested.
 
 ### D-010 clang-cl: every Clang major from the library's floor, each with an STL that accepts it
-- **Date:** 2026-10-10. **Status:** Proposed. **Related:** T7, F-9, F-13.
+- **Date:** 2026-10-10. **Status:** Proposed. **Related:** T7, F-9, F-13, D-015.
 - **Decision:**
-  - CI builds the C++20 smoke check with clang-cl:
-    - **Clang 17**, the library's floor (official LLVM release), with the 14.42 toolset's STL;
-    - **Clang 18** (official LLVM release), with the 14.43 STL;
-    - the clang-cl **bundled** with VS 2022 17.14 (14.44 STL) and with VS 2026 (14.5x STL);
-    - the runner's **standalone** LLVM (20 today), which picks up newer majors as the images
-      update.
-  - The full suite runs with the clang-cl bundled with VS 2026.
+  - CI builds the C++20 smoke check with clang-cl, in one job per Clang major from **17** (the
+    library's floor) to the newest (**22** today). Each job is pinned to its major and paired with
+    an MSVC STL that accepts it (F-9):
+    - Clang 17 with the 14.42 STL;
+    - Clang 18 with the 14.43 STL;
+    - Clang 19 and later with the 14.44 STL.
+  - Majors already on the runner are used as installed. The others come from official LLVM
+    releases (D-015). New majors are added as they are released.
+  - CI also builds it with the clang-cl **bundled** with VS 2022 17.14 and with VS 2026.
+  - The full suite and the demo run with the clang-cl bundled with VS 2026.
 - **Why:**
   - The brief asks for the same coverage as MSVC.
   - The MSVC STL sets its own minimum Clang (F-9). Pairing each Clang with an STL that accepts it
     tests the library's own floor on Windows too.
+  - Pinning each major keeps coverage stable when the runner images update their LLVM.
   - The bundled clang-cl is exactly what Visual Studio users get.
-- **Alternative:** Only the clang-cl bundled with each Visual Studio. Cheaper, but Clang 17 and 18
+- **Alternative:** Only the clang-cl bundled with each Visual Studio. Cheaper, but most Clang majors
   would go untested on Windows.
 
 ### D-024 libc++ incompatibility is a bug, fixed whatever the macOS scope
@@ -223,11 +228,15 @@ reused, so they may appear out of numeric order.
 - **Alternatives:** Self-hosted runners or another CI service. Both add cost and administration.
 
 ### D-012 Workflow security baseline
-- **Date:** 2026-10-10. **Status:** Proposed. **Related:** T5 onwards.
+- **Date:** 2026-10-10. **Status:** Proposed. **Related:** T5 onwards, F-12, Q-16.
 - **Decision:**
   - Workflows default to `permissions: contents: read`.
   - Third-party actions are pinned to full commit SHAs, with a version comment, and Dependabot keeps
     them current.
+  - Dependabot's version updates for GitHub Actions come as one grouped weekly PR into
+    `develop-release_1`. Dependabot alerts are on, but its automatic security-update PRs are off:
+    they always target the default branch, which is `main` after the release (F-12). The weekly
+    version updates bring the same fixes.
   - Checkouts do not persist credentials.
   - No `pull_request_target` workflows.
   - No secrets in pull-request jobs.
@@ -242,14 +251,17 @@ reused, so they may appear out of numeric order.
     branch.
   - A final gate job, `ci-ok`, depends on every other job. It always runs, and it fails unless all
     of them succeeded.
-  - You add a ruleset that requires `ci-ok` as the only status check, and requires the branch to be
-    up to date before merging. The merge queue can be used if it is available for this repository.
+  - You add two rulesets (Q-16), each requiring `ci-ok` as the only status check. The one for
+    `develop-release_1` also requires the branch to be up to date before merging.
 - **Why:**
   - This is exactly the brief's "run as they would be merged with the base branch".
-  - The up-to-date rule closes the gap when the base branch moves after CI has run.
+  - The up-to-date rule closes the gap when the base branch moves after CI has run. `main` changes
+    only through promotions, so it does not need the rule, and promotions never need `main` merged
+    back first.
   - A skipped job counts as passing (F-12). Without the gate, a job skipped because another job
     failed could let a broken PR through.
   - With one required check, adding or renaming matrix jobs never needs a ruleset change.
+- **Alternative:** A merge queue. With one PR at a time it adds nothing over the up-to-date rule.
 
 ### D-014 Trigger scope grows in two phases
 - **Date:** 2026-10-10. **Status:** Proposed. **Related:** T5, T16, D-028.
@@ -290,6 +302,8 @@ reused, so they may appear out of numeric order.
   1. Compilers preinstalled on the runner.
   2. Otherwise, the Ubuntu archive. Example: `clang-19` and libc++ on `ubuntu-24.04`.
   3. Otherwise, an official Docker image. Example: `gcc:11.1` for the GCC floor.
+  - On Windows, step 2 is the Visual Studio installer, for older MSVC toolsets (F-13), and step 3
+    is an official LLVM release installer, pinned by version and SHA-256 checksum, for clang-cl.
   - No third-party PPAs, and no `curl | bash` installers.
 - **Why:** This favours reproducibility, speed and supply-chain hygiene, and every source is
   documented.
@@ -417,6 +431,8 @@ reused, so they may appear out of numeric order.
     it.
   - A pre-release tag (for example `v1.0.0-rc.1`) dry-runs the pipeline before 1.0.0. You push it
     on `develop-release_1`, so no promotion is needed for it.
+  - Between releases, documentation-only changes can be promoted without a tag, so `main` shows
+    current instructions (for example after T21).
 - **Why:**
   - Registries reference immutable tags and checksums.
   - SemVer tells users which upgrades are safe.

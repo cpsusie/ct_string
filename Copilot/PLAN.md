@@ -54,7 +54,8 @@ Details and reproduction steps are in [FINDINGS.md](FINDINGS.md).
    and the decision log.
 5. **Review.** You review the code, the docs (including the Latin) and the plan for the next task.
    Then you approve and merge.
-6. **Next task.** Only then does the next task start. No two task PRs are open at once.
+6. **Next task.** Only then does the next task start. No two task PRs are open at once; your
+   promotion PRs and Dependabot's PRs are outside this rule (D-003).
 
 ### 3.2 Definition of done (applies to every task, on top of the task's own)
 
@@ -162,8 +163,8 @@ Explicit runner labels throughout (D-011).
 | Sanitizers | `ubuntu-24.04` | GCC 14, Clang 20 | Suite under AddressSanitizer and UndefinedBehaviorSanitizer |
 | Linux arm64 (Q-18) | `ubuntu-24.04-arm` | GCC 14 | Full suite (where `char` is unsigned) |
 | CMake versions | `ubuntu-24.04` | CMake 3.21 and newest 4.x | Configure, build, install, consume |
-| Windows, MSVC | `windows-2022`, `windows-2025-vs2026` | Every toolset: v142 14.29, v143 14.30–14.44, v145 14.5x. Those not preinstalled are added during the job (F-13, Q-06). | Smoke on all; suite on v145 (and 14.44 while it passes) |
-| Windows, clang-cl | `windows-2022`, `windows-2025-vs2026` | Clang 17 with the 14.42 STL; Clang 18 with the 14.43 STL; bundled clang-cl of VS 2022 17.14 and VS 2026; standalone LLVM 20 | Smoke on all; suite on VS 2026's clang-cl |
+| Windows, MSVC | `windows-2022`, `windows-2025-vs2026` | Every toolset: v142 14.29, v143 14.30–14.44, v145 14.5x. Those not preinstalled are added during the job (F-13, Q-06). | Smoke on all; suite and demo on v145, and on 14.44 while they pass |
+| Windows, clang-cl | `windows-2022`, `windows-2025-vs2026` | One job per Clang major, 17 to the newest (22 today), each paired with an STL that accepts it: 17 with 14.42, 18 with 14.43, 19+ with 14.44. Also the clang-cl bundled with VS 2022 17.14 and VS 2026. | Smoke on all; suite and demo on VS 2026's clang-cl |
 | macOS (Q-07) | `macos-15` | AppleClang | Smoke; suite if feasible |
 | Packaging | `ubuntu-24.04`, `windows-2025-vs2026` | — | vcpkg overlay port and `conan create`; test suite built against each package |
 
@@ -180,6 +181,8 @@ A final gate job, `ci-ok`, depends on every job above. It is the only check the 
 5. You push a tag `vX.Y.Z` on `main`.
 6. The release workflow creates the GitHub Release, with notes and checksums.
 7. Updates to the vcpkg port and the ConanCenter recipe reference that tag.
+8. Between releases, you can promote documentation-only changes without a tag, so `main` shows
+   current instructions (for example after T21).
 
 ## 6. Milestones and tasks
 
@@ -192,7 +195,7 @@ Sizes: **S** is under about 150 changed lines, **M** is about 150–400. Anythin
 | T2 | Restore the silently disabled fmt tests | M1 | S | T1 | review |
 | T3 | Make comparisons portable to libc++ | M1 | M | T2 | review |
 | T4 | CMake hygiene: version range, optional tests and dependencies, presets | M2 | M | T3 | review |
-| T5 | CI skeleton and security baseline | M2 | M | T4 | **set up ruleset; default branch (Q-21)** |
+| T5 | CI skeleton and security baseline | M2 | M | T4 | **set up rulesets and Dependabot settings; default branch (Q-21)** |
 | T6 | Linux compiler matrix (floors and C++23 suite) | M2 | M | T5 | review |
 | T7 | Windows matrix (MSVC and clang-cl) | M2 | M | T6 | review |
 | T8 | libc++, sanitizers, macOS | M2 | M | T7 | review |
@@ -208,7 +211,7 @@ Sizes: **S** is under about 150 changed lines, **M** is about 150–400. Anythin
 | T18 | Release 1.0.0 | M5 | S | T17 | **promote to `main`, push tag** |
 | T19 | Submit the port to `microsoft/vcpkg` | M6 | S | T18 | **fork and open PR** |
 | T20 | Submit the recipe to ConanCenter | M6 | S | T19 (its PR here) | **sign CLA, open PR** |
-| T21 | Post-release follow-up | M6 | S | T19, T20 | review |
+| T21 | Post-release follow-up | M6 | S | T19, T20 | review; **promote the docs to `main` (no tag)** |
 
 ### M0: Plan
 
@@ -327,19 +330,20 @@ runners and containers; required status checks and rulesets; Dependabot; least-p
       while fmt is present" comes with T11;
     - the gate job `ci-ok`. It depends on every other job, always runs, and fails unless they all
       succeeded (D-013).
-  - `.github/dependabot.yml`, for GitHub Actions updates, with version updates targeting
-    `develop-release_1` (D-028).
+  - `.github/dependabot.yml`: GitHub Actions version updates as one grouped weekly PR into
+    `develop-release_1` (D-012, D-028).
   - `.github/pull_request_template.md`, containing the §3.2 checklist.
   - A CI badge in README and LEGENDUM.
 - **You:**
-  - create the branch ruleset for `develop-release_1` and `main`, requiring `ci-ok` (Q-16);
+  - create the two branch rulesets, both requiring `ci-ok`, and apply the Dependabot settings
+    (Q-16);
   - if Q-21 is (a), make `develop-release_1` the default branch.
 
   The PR includes click-by-click steps for both.
 - **Done when:**
   - the workflow is green on the PR's merge commit, and again on `develop-release_1` after merging;
   - a job made to fail on a scratch branch turns `ci-ok` red;
-  - the ruleset requires `ci-ok`;
+  - both rulesets require `ci-ok`;
   - with the Q-21 setting applied, a manual run starts from the Actions tab and Dependabot reports a
     successful check. Any feature that cannot work yet is listed in the PR, with the reason.
 
@@ -366,10 +370,12 @@ runners and containers; required status checks and rulesets; Dependabot; least-p
     are installed side by side during the job (F-13). Each job confirms that the requested toolset
     is the one compiling.
   - clang-cl (D-010):
-    - Clang 17 with the 14.42 STL and Clang 18 with the 14.43 STL, from official LLVM releases;
-    - the clang-cl bundled with VS 2022 17.14 and with VS 2026;
-    - the runner's standalone LLVM.
-  - The smoke check runs on every one of these. The C++23 suite runs on the newest (Q-20).
+    - one job per Clang major from 17 to the newest (22 today), each pinned to its major and paired
+      with an STL that accepts it: 17 with 14.42, 18 with 14.43, 19 and later with 14.44. Majors
+      not on the runner come from official LLVM releases (D-015);
+    - the clang-cl bundled with VS 2022 17.14 and with VS 2026.
+  - The smoke check runs on every one of these. The C++23 suite and the demo run on VS 2026 (MSVC
+    and its bundled clang-cl), and on VS 2022 17.14's MSVC while they pass there (D-008, Q-20).
   - Each job prints the toolsets it finds.
   - vcpkg binary caching.
   - README and LEGENDUM get a Windows toolchain table.
@@ -561,7 +567,10 @@ The upstream PRs live in other repositories, so the "one PR at a time" rule does
   - README and LEGENDUM install instructions point at the official registries, with badges.
   - Document the maintenance routine: Dependabot PRs, the weekly CI run, and how to cut a patch
     release.
-- **Done when:** the docs are updated, and the plan is closed out or the next cycle is planned.
+- **You:** after merging, promote `develop-release_1` into `main` without a tag, so `main` shows the
+  new instructions (D-026).
+- **Done when:** the docs are updated and promoted to `main`, and the plan is closed out or the
+  next cycle is planned.
 
 ## 7. Timeline
 
@@ -573,14 +582,14 @@ more than the dates.
 | Week | Tasks | Checkpoint |
 |---|---|---|
 | 1 | T2, T3 | M1 re-plan |
-| 2 | T4, T5 (plus your ruleset and default-branch setting) | — |
+| 2 | T4, T5 (plus your rulesets and default-branch setting) | — |
 | 3 | T6, T7 | — |
 | 4 | T8, T9 | M2 re-plan |
 | 5 | T10, T11 | M3 re-plan |
 | 6 | T12, T13 | M4 re-plan |
 | 7 | T14, T15 (plus your rc tag), T16 | — |
 | 8 | T17, T18 (your promotion and tag) → **v1.0.0 released** | M5 re-plan |
-| 9+ | T19, T20 (registry reviews take days to weeks), T21 | M6 close-out |
+| 9+ | T19, T20 (registry reviews take days to weeks), T21 (plus your documentation promotion) | M6 close-out |
 
 ## 8. Risks and mitigations
 
@@ -600,20 +609,21 @@ Risk IDs use K-n, to avoid clashing with the requirement IDs (R-n) in §4.
 | K-10 | Scope creep (modules, more platforms) | Medium | Medium | Backlog (§11) and the decision log. |
 | K-11 | Installing older MSVC toolsets makes PR runs slow, or one is withdrawn from the installer | Medium | Low–Medium | T7 measures the cost, and Q-06 option (b) moves the full sweep to after merging. A toolset that cannot be installed fails its job visibly; a small PR then updates the matrix and the docs. |
 | K-12 | Features that read the default branch silently do nothing (weekly run, Dependabot, templates) | High without action | Medium | F-12 and Q-21. T5 checks each feature after merging. |
-| K-13 | `main` changes outside promotions, so a promotion conflicts | Low | Medium | Rulesets allow changes to `main` only through PRs, and promotions use a merge commit (D-003). |
+| K-13 | `main` changes outside promotions, so a promotion conflicts | Low | Medium | Rulesets allow changes to `main` only through PRs; Dependabot's security PRs, which would target `main`, are off (D-012); promotions use a merge commit (D-003). |
 
 ## 9. What only you can do
 
 1. Review and merge every PR.
 2. Answer [QUESTIONS.md](QUESTIONS.md), now or by each question's "Needed by" task.
-3. **After T5:** create the branch ruleset and set the merge options (Q-16). If Q-21 is (a), make
-   `develop-release_1` the default branch.
+3. **After T5:** create the two branch rulesets, and set the merge options and the Dependabot
+   settings (Q-16). If Q-21 is (a), make `develop-release_1` the default branch.
 4. **T6, only if needed:** add a Docker Hub access-token secret (Q-17).
 5. **After T15:** push the `v1.0.0-rc.1` tag on `develop-release_1` (the dry run).
 6. **T18:** promote `develop-release_1` into `main` (a PR you open, merged with a merge commit),
    push the `v1.0.0` tag on `main`, and, if Q-21 is (a), make `main` the default branch again.
 7. **T19 and T20:** fork the registries, open the PRs, sign the ConanCenter CLA, and work with the
    reviewers.
+8. **After T21:** promote the updated documentation into `main`, without a tag.
 
 ## 10. Status
 

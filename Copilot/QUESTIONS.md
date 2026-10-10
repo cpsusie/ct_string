@@ -32,7 +32,7 @@ questions.
 | Q-13 | Which new documents need Latin | T14 | Only README and LEGENDUM are bilingual; everything else is English |
 | Q-14 | Code formatter (clang-format) | T5 | Not before 1.0; revisit afterwards |
 | Q-15 | Role of `test_console_app` | T10 | A demo that checks itself: move it to `examples/`, behind an option; CI builds and runs it |
-| Q-16 | GitHub repository settings | T5 | Rulesets on `develop-release_1` and `main` requiring the one `ci-ok` check; squash for task PRs, merge commit for promotions; delete merged branches |
+| Q-16 | GitHub repository settings | T5 | Two rulesets requiring the one `ci-ok` check: `develop-release_1` (up to date, squash) and `main` (merge commit); delete merged branches; Dependabot security PRs off |
 | Q-17 | CI budget and Docker Hub | T6 | Full matrix (about 50 jobs) on every PR and push; anonymous pulls of the official `gcc` images |
 | Q-18 | CPU architectures | T6 | x64 everywhere, plus one Linux arm64 job (GCC 14, full suite) |
 | Q-19 | Community files and documentation hosting | T17 | Add CONTRIBUTING and SECURITY files and issue templates; no separate docs site |
@@ -230,16 +230,19 @@ questions.
 
 ### Q-16 GitHub repository settings (you apply these; T5 includes click-by-click steps)
 - **Recommendation:**
-  - A branch ruleset on `develop-release_1` and `main` that:
-    - requires a PR;
-    - requires the single status check `ci-ok`, the CI gate job (D-013);
-    - requires branches to be up to date;
-    - blocks force pushes and deletion.
-  - Merge methods: squash for task PRs into `develop-release_1`; a merge commit for promotions into
-    `main` (D-003). A ruleset can enforce each.
+  - Two branch rulesets. Both require a PR and the single status check `ci-ok`, the CI gate job
+    (D-013), and both block force pushes and deletion.
+    - **`develop-release_1`:** also requires the branch to be up to date before merging. The only
+      merge method allowed is squash.
+    - **`main`:** the only merge method allowed is a merge commit, for promotions (D-003). It does
+      not require up to date: `main` changes only through promotions, so that rule would force
+      merging `main` back into `develop-release_1` before every promotion.
+  - In the repository's merge settings, allow both squash and merge commits. The rulesets then
+    restrict each branch.
   - Turn on "Automatically delete head branches". The deletion block keeps `develop-release_1`
     after a promotion (FINDINGS F-12).
-  - Use the merge queue if GitHub offers it for this repository.
+  - Dependabot: alerts on, automatic security-update PRs off (D-012).
+  - No merge queue: with one PR at a time it adds nothing over the up-to-date rule.
 - **Answer:** _pending_
 
 ### Q-17 CI budget and Docker Hub
