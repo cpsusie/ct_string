@@ -222,8 +222,8 @@ Sizes: **S** is under about 150 changed lines, **M** is about 150–400. Anythin
 - **Done when:** you have reviewed and merged it. Answering the questions now is welcome but not
   required: each is needed only by its "Needed by" task, and answers given during this review are
   recorded in the T2 PR.
-- **Outcome.** During the review you answered Q-01, Q-06, Q-16 and Q-21, accepting the defaults.
-  T2 records the answers.
+- **Outcome.** Right after merging it, you answered Q-01, Q-06, Q-16 and Q-21, accepting the
+  defaults. T2 records the answers.
 
 ### M1: Correctness fixes found while planning (week 1)
 
@@ -329,8 +329,8 @@ my standard library" is not the same as standard C++.
   5. Docs, in README and LEGENDUM together:
      - "Requirements" ("Quae requirantur"): libc++ 17 or later works. Until T8 adds it to CI, it
        is described as verified locally.
-     - The quick-start comparison example (README around line 173, LEGENDUM around line 137):
-       list what a view compares with.
+     - The comparison example in "The two types at a glance" ("Duo genera breviter"; README around
+       line 173, LEGENDUM around line 137): list what a view compares with.
   6. Log the outcomes of Q-22 and Q-23 as decisions. Update this plan: status, and T4 in full.
 - **Definition of done.**
   - The smoke target, with the new checks, compiles with `-Werror` on:
@@ -698,7 +698,7 @@ Risk IDs use K-n, to avoid clashing with the requirement IDs (R-n) in §4.
 
 | Task | Status | PR | Notes |
 |---|---|---|---|
-| T1 | Merged | #14 | Plan, decisions, questions, findings. You answered Q-01, Q-06, Q-16 and Q-21 in review. |
+| T1 | Merged | #14 | Plan, decisions, questions, findings. You then answered Q-01, Q-06, Q-16 and Q-21. |
 | T2 | In review | this PR | fmt tests restored, with a guard (D-029); the four answers recorded; Q-22 and Q-23 added for T3 |
 | T3 | Next: planned in full | — | Q-22 and Q-23 have defaults; neither blocks it |
 | T4–T21 | Planned (outline) | — | Each is detailed in the PR of the task before it |

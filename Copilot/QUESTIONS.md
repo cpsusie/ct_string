@@ -9,7 +9,7 @@ questions.
   when the task in its "Needed by" column starts, Copilot asks again in that task's PR before
   relying on the default.
 - **Where answers go.** Copilot records each answer below, in the next task's PR, and updates the
-  matching decision in [DECISIONS.md](DECISIONS.md). The answers you gave while reviewing T1
+  matching decision in [DECISIONS.md](DECISIONS.md). The answers you gave after T1 was merged
   (Q-01, Q-06, Q-16 and Q-21) are recorded in the T2 PR.
 - **New in T2:** Q-22 and Q-23, both about T3. Each has a default, so neither blocks T3. Of the
   older questions, Q-09 is the next one needed (by T4).
@@ -66,9 +66,9 @@ questions.
   - Keep `cstr_view` as an alias target so that existing in-tree users keep building.
   - If vcpkg maintainers think `ct-string` is ambiguous, fall back to `cpsusie-ct-string`. Their
     guide explicitly accepts the owner-plus-repository form.
-- **Answer (2026-10-11, T1 review):** the recommendation is accepted: "package, CMake and target
-  names. (accept defaults)". D-019 is now accepted. T4 renames the CMake project and adds the
-  `CT_STRING_` options; T9 exports `ct_string::ct_string`.
+- **Answer (2026-10-11, in reply to T1):** the recommendation is accepted: "package, CMake and
+  target names. (accept defaults)". D-019 is now accepted. T4 renames the CMake project and adds
+  the `CT_STRING_` options; T9 exports `ct_string::ct_string`.
 
 ### Q-02 Include directory, macro prefix and include guards
 - **Context.**
@@ -125,9 +125,9 @@ questions.
     are faster, but a problem with a toolset in between is found just after merging, not before.
   - (c) VS 2022 (v143) and later, newest version of each Visual Studio only. Cheapest, but it does
     not meet the brief's "any version".
-- **Answer (2026-10-11, T1 review):** option (a): "Yes, accept defaults". D-009 is now accepted.
-  T7 still measures the cost; if the sweep makes PR runs much slower, T7's PR asks you again
-  before switching to (b).
+- **Answer (2026-10-11, in reply to T1):** option (a): "Yes, accept defaults". D-009 is now
+  accepted. T7 still measures the cost; if the sweep makes PR runs much slower, T7's PR asks you
+  again before switching to (b).
 
 ### Q-07 macOS / AppleClang in scope?
 - **Context.**
@@ -250,7 +250,7 @@ questions.
     after a promotion (FINDINGS F-12).
   - Dependabot: alerts on, automatic security-update PRs off (D-012).
   - No merge queue: with one PR at a time it adds nothing over the up-to-date rule.
-- **Answer (2026-10-11, T1 review):** the recommendation is accepted, to be applied after T5:
+- **Answer (2026-10-11, in reply to T1):** the recommendation is accepted, to be applied after T5:
   "Yes, after after T5. (accept defaults)". You apply the settings once T5 is merged, using the
   click-by-click steps in T5's PR. The `ci-ok` check they require exists only from T5 on. D-003,
   D-012 and D-013 already assume these settings.
@@ -310,8 +310,8 @@ questions.
     unreleased work.
   - (c) Keep `main` as the default, and accept that the features above start only at the release.
     PR and push CI still runs from T5.
-- **Answer (2026-10-11, T1 review):** option (a): "make develop-release_1 the default branch from
-  T5 until the release. (yes please do this)". D-028 is now accepted.
+- **Answer (2026-10-11, in reply to T1):** option (a): "make develop-release_1 the default branch
+  from T5 until the release. (yes please do this)". D-028 is now accepted.
   - Copilot cannot change repository settings: it can only push branches to this repository. So
     **you** make the switch, when T5 is merged. T5's PR gives the steps, and T18's PR gives the
     steps for switching back to `main` at the release.

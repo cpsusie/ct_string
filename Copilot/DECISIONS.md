@@ -10,7 +10,8 @@ This file records every project decision and the reason for it, as the brief
   unless it is marked *pending*. The next task's PR then updates the status here.
 - **Pending Q-nn:** waits on your answer to that question in [QUESTIONS.md](QUESTIONS.md). Until
   then, the recommended default shown is only a working assumption. Your answer may change the
-  decision.
+  decision. When only some items of a decision depend on the question, just those items are marked
+  *pending Q-nn*; the rest is accepted.
 - **Accepted:** approved by you.
 - **Superseded by D-nnn:** replaced by a later decision. Entries are never deleted, only
   superseded, so the history stays readable.
@@ -56,7 +57,8 @@ reused, so they may appear out of numeric order.
 - **Alternative:** Detail every task now. That is brittle and creates rework.
 
 ### D-003 Branch and PR workflow
-- **Date:** 2026-10-10. **Status:** Accepted (T1, PR #14). **Related:** all tasks, D-026, Q-11, Q-16.
+- **Date:** 2026-10-10. **Status:** Accepted (T1, PR #14).
+  **Related:** all tasks, D-026, Q-11, Q-16.
 - **Decision:**
   - Every task branches from the latest `develop-release_1`, and its PR targets `develop-release_1`.
   - One Copilot task PR is open at a time. Your promotion PRs and Dependabot's PRs are outside this
@@ -91,7 +93,8 @@ reused, so they may appear out of numeric order.
 - **Why:** The plan is internal project management. Users of the library see no difference.
 
 ### D-023 Fix the defects found during planning before building CI on top of them
-- **Date:** 2026-10-10. **Status:** Accepted (T1, PR #14). **Related:** T2, T3, findings F-4 and F-5.
+- **Date:** 2026-10-10. **Status:** Accepted (T1, PR #14).
+  **Related:** T2, T3, findings F-4 and F-5.
 - **Decision:**
   - The two code defects found while planning are milestone M1, one PR each, with tests and docs:
     - the stale `CJM_` test macro;
@@ -143,13 +146,14 @@ reused, so they may appear out of numeric order.
 - **Alternative:** Support Clang 16 with a targeted workaround. Possible if you want it (Q-05).
 
 ### D-008 Toolchains for the full C++23 test suite
-- **Date:** 2026-10-10. **Status:** Accepted (T1, PR #14). **Related:** T6, T7, F-3, Q-20.
+- **Date:** 2026-10-10. **Status:** Accepted (T1, PR #14), except the items marked *pending Q-20*.
+  **Related:** T6, T7, F-3, Q-20.
 - **Decision:**
   - CI runs the full suite and the demo on GCC 14 and 15.
   - Also on Clang 19, 20, 21 and 22 with libstdc++.
-  - Also on the newest MSVC (VS 2026) and the clang-cl bundled with VS 2026.
+  - Also on the newest MSVC (VS 2026) and the clang-cl bundled with VS 2026 (*pending Q-20*).
   - The suite is also run on VS 2022 17.14 for as long as it passes there; that is a goal, not a
-    promise.
+    promise (*pending Q-20*).
   - GCC 13 currently passes too, but is not promised.
 - **Why:** These are the brief's stated floors, confirmed by the probe (F-3). Promising less than
   what happens to work keeps the test project free to use newer C++23 features.
@@ -180,18 +184,19 @@ reused, so they may appear out of numeric order.
   versions in between. Both are cheaper, but leave toolsets the brief covers untested.
 
 ### D-010 clang-cl: every Clang major from the library's floor, each with an STL that accepts it
-- **Date:** 2026-10-10. **Status:** Accepted (T1, PR #14). **Related:** T7, F-9, F-13, D-015.
+- **Date:** 2026-10-10. **Status:** Accepted (T1, PR #14), except the items marked *pending*.
+  **Related:** T7, F-9, F-13, D-007, D-015, Q-05, Q-20.
 - **Decision:**
   - CI builds the C++20 smoke check with clang-cl, in one job per Clang major from **17** (the
-    library's floor) to the newest (**22** today). Each job is pinned to its major and paired with
-    an MSVC STL that accepts it (F-9):
+    library's floor, set by D-007: *pending Q-05*) to the newest (**22** today). Each job is
+    pinned to its major and paired with an MSVC STL that accepts it (F-9):
     - Clang 17 with the 14.42 STL;
     - Clang 18 with the 14.43 STL;
     - Clang 19 and later with the 14.44 STL.
   - Majors already on the runner are used as installed. The others come from official LLVM
     releases (D-015). New majors are added as they are released.
   - CI also builds it with the clang-cl **bundled** with VS 2022 17.14 and with VS 2026.
-  - The full suite and the demo run with the clang-cl bundled with VS 2026.
+  - The full suite and the demo run with the clang-cl bundled with VS 2026 (*pending Q-20*).
 - **Why:**
   - The brief asks for the same coverage as MSVC.
   - The MSVC STL sets its own minimum Clang (F-9). Pairing each Clang with an STL that accepts it
