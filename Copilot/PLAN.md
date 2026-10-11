@@ -394,7 +394,7 @@ my standard library" is not the same as standard C++.
     - `noexcept` is unchanged for every comparison that compiled before, `nullptr` aside: the
       compile-time checks assert it for every operand kind;
     - after Q-24, all of the above again: the smoke target on every toolchain listed, in C++20 and
-      C++23 mode, and the suite and demo on GCC 14 (Debug and Release), Clang 20 (Debug) and
+      C++23 mode, and the suite and demo on GCC 14 and Clang 20 (Debug and Release) and on
       Clang 20 + libc++ 20. All 175 tests pass, and the demo exits with 0;
     - each of the 40 container lookups, `const` or not, called with `nullptr` and with `0`,
       reports a deleted function, never an ambiguity, with GCC 14, Clang 20 and Clang 20 +
