@@ -37,6 +37,7 @@
 //       takes std_sv_type BY VALUE. Every basic_ct_string_view (either
 //       flavor), std::basic_string, basic_fixed_string and string literal
 //       converts implicitly, so all of them just work at the call site.
+//       nullptr, and a literal 0, do not compile (D-032).
 //
 // That asymmetry is the whole point of the design. It is enforced
 // structurally, not by convention: key_type is simply not constructible from
@@ -387,6 +388,30 @@ namespace cps::ct_string
             return 1;
         }
 
+        // -- nullptr is never a key ------------------------------------------
+        //
+        // std_sv_type converts from nullptr in C++20 (P2166 removed that in
+        // C++23), and the lookup would then have undefined behavior. So every
+        // lookup member has a deleted std::nullptr_t overload, const-qualified
+        // like the member itself. nullptr, and a literal 0, match it better than
+        // std_sv_type, so passing either does not compile, with any standard
+        // library or language version (D-032).
+        iterator find(std::nullptr_t) = delete;
+        const_iterator find(std::nullptr_t) const = delete;
+        bool contains(std::nullptr_t) const = delete;
+        size_type count(std::nullptr_t) const = delete;
+        iterator lower_bound(std::nullptr_t) = delete;
+        const_iterator lower_bound(std::nullptr_t) const = delete;
+        iterator upper_bound(std::nullptr_t) = delete;
+        const_iterator upper_bound(std::nullptr_t) const = delete;
+        std::pair<iterator, iterator> equal_range(std::nullptr_t) = delete;
+        std::pair<const_iterator, const_iterator> equal_range(std::nullptr_t) const = delete;
+        mapped_type& at(std::nullptr_t) = delete;
+        const mapped_type& at(std::nullptr_t) const = delete;
+        mapped_type* at_if(std::nullptr_t) = delete;
+        const mapped_type* at_if(std::nullptr_t) const = delete;
+        size_type erase(std::nullptr_t) = delete;
+
         // -- interop ---------------------------------------------------------
 
         /// \brief Escape hatch to the wrapped std::map.
@@ -545,6 +570,15 @@ namespace cps::ct_string
             base_type::erase(it);
             return 1;
         }
+
+        // -- nullptr is never a key (see basic_ctsv_map) ---------------------
+        iterator find(std::nullptr_t) const = delete;
+        bool contains(std::nullptr_t) const = delete;
+        size_type count(std::nullptr_t) const = delete;
+        iterator lower_bound(std::nullptr_t) const = delete;
+        iterator upper_bound(std::nullptr_t) const = delete;
+        std::pair<iterator, iterator> equal_range(std::nullptr_t) const = delete;
+        size_type erase(std::nullptr_t) = delete;
 
         /// \brief Escape hatch to the wrapped std::set.
         [[nodiscard]] base_type& base() noexcept { return *this; }
@@ -783,6 +817,19 @@ namespace cps::ct_string
             return 1;
         }
 
+        // -- nullptr is never a key (see basic_ctsv_map) ---------------------
+        iterator find(std::nullptr_t) = delete;
+        const_iterator find(std::nullptr_t) const = delete;
+        bool contains(std::nullptr_t) const = delete;
+        size_type count(std::nullptr_t) const = delete;
+        std::pair<iterator, iterator> equal_range(std::nullptr_t) = delete;
+        std::pair<const_iterator, const_iterator> equal_range(std::nullptr_t) const = delete;
+        mapped_type& at(std::nullptr_t) = delete;
+        const mapped_type& at(std::nullptr_t) const = delete;
+        mapped_type* at_if(std::nullptr_t) = delete;
+        const mapped_type* at_if(std::nullptr_t) const = delete;
+        size_type erase(std::nullptr_t) = delete;
+
         /// \brief Escape hatch to the wrapped std::unordered_map.
         [[nodiscard]] base_type& base() noexcept { return *this; }
         /// \copydoc base
@@ -938,6 +985,15 @@ namespace cps::ct_string
             base_type::erase(it);
             return 1;
         }
+
+        // -- nullptr is never a key (see basic_ctsv_map) ---------------------
+        iterator find(std::nullptr_t) = delete;
+        const_iterator find(std::nullptr_t) const = delete;
+        bool contains(std::nullptr_t) const = delete;
+        size_type count(std::nullptr_t) const = delete;
+        std::pair<iterator, iterator> equal_range(std::nullptr_t) = delete;
+        std::pair<const_iterator, const_iterator> equal_range(std::nullptr_t) const = delete;
+        size_type erase(std::nullptr_t) = delete;
 
         /// \brief Escape hatch to the wrapped std::unordered_set.
         [[nodiscard]] base_type& base() noexcept { return *this; }

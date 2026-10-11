@@ -447,7 +447,8 @@ distinction in the type system:
 - **Looking up** (`at`, `at_if`, `find`, `contains`, `count`, `erase`,
   `lower_bound`, ...) takes the `std::basic_string_view` **by value**. Every
   `basic_ct_string_view` (either flavor), `std::basic_string`,
-  `basic_fixed_string` and string literal converts implicitly.
+  `basic_fixed_string` and string literal converts implicitly. `nullptr`, and
+  a literal `0`, do not compile.
 
 ```c++
 #include <ct_str/ctsv_containers.hpp>
@@ -520,7 +521,7 @@ std::ranges::sort(v, ctsv_ci_less<char>{});     // Alpha, Bravo, charlie, delta
 static_assert(ctsv_ci_hash<char>{}("Ace") == ctsv_ci_hash<char>{}("ACE"));
 ```
 
-Three things are worth knowing:
+Four things are worth knowing:
 
 1. **The fold direction is observable.** These fold *down*. `'_'` is `0x5F`,
    between `'Z'` (`0x5A`) and `'a'` (`0x61`), so folding down makes `"Z"`
@@ -534,6 +535,11 @@ Three things are worth knowing:
    testing, so these are FNV-1a over code units. If you need the standard
    library's hash instead, pass `std::hash<basic_ct_string_view<TChar, B>>`
    explicitly -- it is transparent and pairs correctly with `std::equal_to<>`.
+4. **`nullptr` is never a key.** Passing `nullptr` to any of these function
+   objects, to `std::hash<basic_ct_string_view<TChar, B>>`, or to a container's
+   lookup does not compile, whatever the standard library or language version.
+   In C++20, `std::basic_string_view` itself still converts from `nullptr`, and
+   the call would have undefined behaviour.
 
 ### ASCII only
 
@@ -1047,7 +1053,9 @@ properties. One translation unit
 every public header and instantiates the templates. A second
 ([`tests/cxx20_comparison_checks.cpp`](tests/cxx20_comparison_checks.cpp)) is
 made only of compile-time checks: what the two class templates compare with,
-and what they must not. A C++23-only construct landing in `inc/ct_str`, or a
+and what they must not. It also checks that no comparator, hasher or
+container lookup takes `nullptr`. A C++23-only construct landing in
+`inc/ct_str`, or a
 comparison that one standard library rejects, therefore breaks that target
 immediately instead of only breaking downstream users on older toolchains.
 

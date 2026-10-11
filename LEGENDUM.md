@@ -375,7 +375,7 @@ Ita operatio frequentissima — clavem quaerere et valorem accipere — ipsa non
 `<ct_str/ctsv_containers.hpp>` quattuor formas praebet:
 
 - **Insertio** (`operator[]`, `insert`, `emplace`, `try_emplace`, ...) verum `basic_ct_string_view` requirit. Alia res clavem efficere non potest; receptaculum igitur clavem breviorem se numquam possidet.
-- **Inquisitio** (`at`, `at_if`, `find`, `contains`, `count`, `erase`, `lower_bound`, ...) `std::basic_string_view` **valore** accipit. Utraque species `basic_ct_string_view`, `std::basic_string`, `basic_fixed_string`, litterale implicite convertuntur.
+- **Inquisitio** (`at`, `at_if`, `find`, `contains`, `count`, `erase`, `lower_bound`, ...) `std::basic_string_view` **valore** accipit. Utraque species `basic_ct_string_view`, `std::basic_string`, `basic_fixed_string`, litterale implicite convertuntur. `nullptr` et `0` litterale compositionis tempore recusantur.
 
 ```c++
 #include <ct_str/ctsv_containers.hpp>
@@ -445,11 +445,12 @@ std::ranges::sort(v, ctsv_ci_less<char>{});     // Alpha, Bravo, charlie, delta
 static_assert(ctsv_ci_hash<char>{}("Ace") == ctsv_ci_hash<char>{}("ACE"));
 ```
 
-Tria scienda sunt:
+Quattuor scienda sunt:
 
 1. **Quo versus casus mutetur, ordinem mutat.** Haec ad litteras minores vertunt. `'_'` (`0x5F`) inter `'Z'` (`0x5A`) et `'a'` (`0x61`) iacet; quare `"Z"` post `"_"` ordinatur. Si ad maiores verteretur, contra. Uterque ordo rectus; sed uter habeatur sciendum.
 2. **Ordo casum neglegens debilis, non fortis est.** `"abc"` et `"ABC"` aequivalent, quamquam aequalia non sunt; `ctsv_ci_three_way` igitur `std::weak_ordering`, `ctsv_three_way` autem `std::strong_ordering` reddit.
 3. **`ctsv_hash` non est `std::hash`.** `std::hash` `constexpr` non est; structura igitur tempore compositionis effici aut `static_assert` probari non potest. Hic FNV-1a super unitates characterum adhibetur. Qui hash standard vult, `std::hash<basic_ct_string_view<TChar, B>>` aperte tradat.
+4. **`nullptr` numquam clavis est.** Sive his obiectis, sive `std::hash<basic_ct_string_view<TChar, B>>`, sive inquisitioni receptaculi traditur, compositionis tempore recusatur, quacumque bibliotheca standard aut editione linguae utaris. Nam in C++20 `std::basic_string_view` ipsa etiamnunc ex `nullptr` convertitur; vocatio effectum indefinitum haberet.
 
 ### Tantum ASCII
 
@@ -886,7 +887,7 @@ target_compile_features(... PRIVATE cxx_std_23)
 
 petitur; `CMAKE_CXX_STANDARD` totius operis non tollitur.
 
-Ne hae duae res paulatim confundantur, build continet bibliothecam staticam `cstr_view_cxx20_smoke`, quae C++20 firmiter retinet. Unum eius translation unit, [`tests/cxx20_header_smoke.cpp`](tests/cxx20_header_smoke.cpp), omnia capita publica includit formasque instantiat. Alterum, [`tests/cxx20_comparison_checks.cpp`](tests/cxx20_comparison_checks.cpp), solis probationibus compositionis tempore constat: quibuscum duo genera conferantur, quibuscum non. Si quid C++23 tantum in `inc/ct_str` ingreditur, aut si qua comparatio ab una bibliotheca standard recusatur, hic target statim frangitur; non exspectatur donec usor instrumento vetustiore laboret.
+Ne hae duae res paulatim confundantur, build continet bibliothecam staticam `cstr_view_cxx20_smoke`, quae C++20 firmiter retinet. Unum eius translation unit, [`tests/cxx20_header_smoke.cpp`](tests/cxx20_header_smoke.cpp), omnia capita publica includit formasque instantiat. Alterum, [`tests/cxx20_comparison_checks.cpp`](tests/cxx20_comparison_checks.cpp), solis probationibus compositionis tempore constat: quibuscum duo genera conferantur, quibuscum non. Probat etiam nullum comparatorem, nullum hash, nullam inquisitionem receptaculi `nullptr` accipere. Si quid C++23 tantum in `inc/ct_str` ingreditur, aut si qua comparatio ab una bibliotheca standard recusatur, hic target statim frangitur; non exspectatur donec usor instrumento vetustiore laboret.
 
 ---
 

@@ -290,5 +290,12 @@ therefore gets in-repo vcpkg and Conan configurations instead (decision D-022, q
 - **`nullptr`.** In C++20 mode, with libstdc++ 14 and with libc++ 20, `std::basic_string_view`
   converts from `nullptr`. C++23 (P2166) removes that conversion. The comparators' concept
   `ctsv_lookup_key` and the container lookups therefore accept `nullptr` in C++20 mode (Q-24).
+  - **Outcome.** At your request, T3 applies Q-24 (a), recorded as D-032. Doing so found two more
+    cases:
+    - `std::hash<basic_ct_string_view>` accepted `nullptr` in C++23 mode too, through its
+      overload for `const char_type*`. D-032 covers it.
+    - The view's members that mirror `std::basic_string_view`, such as `compare`, `starts_with`
+      and `find`, take `nullptr` in every language version, exactly as the standard type does
+      (Q-26).
 - **Clang 16** still fails the smoke target, with the same compiler bug as in F-2. T3 did not
   change that.

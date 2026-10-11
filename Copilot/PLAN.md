@@ -353,14 +353,19 @@ my standard library" is not the same as standard C++.
     the result in CI.
 - **Outcome.**
   - **Answers.** Q-22: the default, recorded as D-030. Q-23: option (a), as Copilot reads your note,
-    recorded as D-031; please confirm.
+    recorded as D-031; please confirm. Q-24: option (a), which you asked for in the review,
+    recorded as D-032.
   - **Library.** One non-public constraint, `detail::string_view_comparand` in `fixed_string.hpp`,
     is used by all four templates. It names arrays and pointers of the class's own character type,
     keeps "anything else nothrow-convertible", and rejects `nullptr`. The operators stay
     unconditionally `noexcept`, and their doc comments now list the operands. The misnamed concept
-    checks `noexcept` (Q-23). Only `fixed_string.hpp` and `ct_string_view.hpp` changed, by about
-    75 lines, most of them doc comments; `ctsv_comparators.hpp` and `ctsv_containers.hpp` are
-    unchanged.
+    checks `noexcept` (Q-23). For these, only `fixed_string.hpp` and `ct_string_view.hpp`
+    changed, by about 75 lines, most of them doc comments.
+  - **Library, Q-24 (D-032).** No comparator, hasher or container lookup takes `nullptr`, nor a
+    literal `0`, with any standard library or language version. `ctsv_lookup_key` excludes
+    `std::nullptr_t`. `std::hash<basic_ct_string_view>` and each of the 40 container lookups get
+    a deleted `std::nullptr_t` overload. Three headers changed, by 68 lines, most of them the
+    deleted declarations and their comments.
   - **Tests, written first.** `tests/cxx20_comparison_checks.cpp`, in the smoke target, covers
     every operand kind in step 1, for both classes, both flavours of view and all five character
     types, in both orders, with `==`, `!=`, `<` and `<=>`. It checks `noexcept`, and that other
@@ -370,6 +375,13 @@ my standard library" is not the same as standard C++.
     throwing-conversion assertions (74 errors in all with libc++). With libstdc++ in C++20 mode it
     also failed at the `nullptr` assertions. The suite gained 15 typed tests,
     `RuntimeOperandComparison/*`, for operands that exist only at run time: 160 tests became 175.
+  - **Tests for Q-24, also written first.** The same file checks every comparator and hasher, and
+    every lookup member of the four containers, `const` and not, for all five character types. Each
+    check confirms that `nullptr` and a literal `0` are rejected, and that the keys that worked
+    before still work. On the headers before Q-24, 17 of the 19 new assertions failed in C++20 mode
+    with GCC 14, Clang 20 + libc++ 20 and Clang 17 + libc++ 17; in C++23 mode, the five that
+    include `std::hash` failed. The run-time suite is unchanged: a lookup with `nullptr` cannot be
+    written there any more.
   - **Verified**, all with `-Werror`:
     - smoke target: GCC 11.1 (official container), 12, 13 and 14; Clang 17, 18 and 20 with
       libstdc++; Clang 17 + libc++ 17; Clang 20 + libc++ 20. The new checks also pass in C++23
@@ -380,22 +392,32 @@ my standard library" is not the same as standard C++.
       `/usr/src/googletest`; the demo builds and runs with fmt used header-only. No test-code
       problem was found for T8;
     - `noexcept` is unchanged for every comparison that compiled before, `nullptr` aside: the
-      compile-time checks assert it for every operand kind.
+      compile-time checks assert it for every operand kind;
+    - after Q-24, all of the above again: the smoke target on every toolchain listed, in C++20 and
+      C++23 mode, and the suite and demo on GCC 14 (Debug and Release), Clang 20 (Debug) and
+      Clang 20 + libc++ 20. All 175 tests pass, and the demo exits with 0.
   - **Docs.** README and LEGENDUM, in parallel: "The two types at a glance" ("Duo genera
     breviter") now lists what the types compare with; "Language standard" ("Norma linguae")
     describes the smoke target's second translation unit; "Requirements" ("Quae requirantur")
     says libc++ 17 or later works, verified locally, and that libc++ 17 and 18 leave out
-    `std::formatter`.
+    `std::formatter`. For Q-24: "The fix: wrapper containers" ("Remedium: receptacula") says that
+    `nullptr` and a literal `0` do not compile as lookup keys; "Comparators and hashers"
+    ("Comparatores et hashes") gains a fourth thing worth knowing, "`nullptr` is never a key";
+    the smoke-target paragraph in "Language standard" mentions the new checks. The container
+    header's opening comment says the same.
   - **Found on the way (F-14).**
     - Ubuntu's libc++ 17 and libc++ 20 packages replace each other, so a local "libc++ 20" result
       can silently come from libc++ 17. T3's results were checked against `_LIBCPP_VERSION`.
     - libc++ 17 and 18 do not define `__cpp_lib_format`, so the library's `std::formatter` and
       its seven tests silently drop out there (Q-25).
     - The comparators and container lookups still accept `nullptr` in C++20 mode, because they
-      take `std::basic_string_view` (Q-24).
+      take `std::basic_string_view` (Q-24). You asked for it to be fixed in T3 (D-032).
+    - While doing so: `std::hash<basic_ct_string_view>` took `nullptr` in C++23 mode too (fixed,
+      D-032), and the view's members that mirror `std::basic_string_view` take it in every
+      language version, as the standard type does (Q-26).
   - **Deviation from the plan.** The plan put the Requirements change and the comparison list in
     the docs. The smoke-target paragraph in "Language standard" also needed updating, since it
-    described a single translation unit.
+    described a single translation unit. Q-24, planned for T8, was done in T3 at your request.
 - **M1 checkpoint:** re-plan (§3.4). Done: the M1 retrospective is in §10.
 
 ### M2: Build foundation and CI (weeks 2–4)
@@ -552,7 +574,8 @@ runners and containers; required status checks and rulesets; Dependabot; least-p
       `_LIBCPP_VERSION` (F-14).
   - `std::format` per Q-25. By default: the build states where it expects `std::format`, so the
     `CtSvFormatter.*` tests cannot silently vanish there (D-029, F-14).
-  - `nullptr` in the comparators and container lookups, per Q-24.
+  - `nullptr` in the view's members that mirror `std::basic_string_view`, per Q-26. (Q-24, for
+    the comparators and container lookups, was done in T3: D-032.)
   - The suite under AddressSanitizer and UndefinedBehaviorSanitizer, with GCC 14 and Clang 20.
   - macOS `macos-15` with AppleClang, if Q-07 is yes.
   - README and LEGENDUM rows for libc++ and macOS.
@@ -795,7 +818,7 @@ Risk IDs use K-n, to avoid clashing with the requirement IDs (R-n) in §4.
 |---|---|---|---|
 | T1 | Merged | #14 | Plan, decisions, questions, findings. You then answered Q-01, Q-06, Q-16 and Q-21. |
 | T2 | Merged | #15 | fmt tests restored, with a guard (D-029); the four answers recorded; Q-22 and Q-23 added for T3. You then refined the Latin (#16). |
-| T3 | In review | this PR | Comparisons compile with libc++ 17+ (D-030); misnamed concept fixed (D-031); 175 tests; Q-24 and Q-25 added for T8 |
+| T3 | In review | this PR | Comparisons compile with libc++ 17+ (D-030); misnamed concept fixed (D-031); no comparator, hasher or lookup takes `nullptr` (D-032, Q-24); 175 tests; Q-25 and Q-26 added for T8 |
 | T4 | Next: planned in full | — | Needs Q-09 (default 3.21) |
 | T5–T21 | Planned (outline) | — | Each is detailed in the PR of the task before it |
 
@@ -825,8 +848,9 @@ Risk IDs use K-n, to avoid clashing with the requirement IDs (R-n) in §4.
     floor now also checks what the two class templates compare with.
   - Verifying T3 found three things that were not planned (F-14): Ubuntu's libc++ packages
     replace each other, libc++ 17 and 18 drop `std::formatter` (Q-25), and the comparators and
-    container lookups still take `nullptr` in C++20 mode (Q-24). Both questions are needed by T8,
-    so they block nothing now.
+    container lookups still take `nullptr` in C++20 mode (Q-24). You asked for Q-24 in T3, which
+    applies it (D-032). Doing so found Q-26. Q-25 and Q-26 are needed by T8, so they block nothing
+    now.
   - Planning T4 with a prototype showed that CMake 3.21 already builds the project as it is. The
     risk in T4 is the option and dependency wiring, not the version.
 - **Risks.** K-2 stays Low: the suite passed with libc++ 20 unchanged. No new risk.

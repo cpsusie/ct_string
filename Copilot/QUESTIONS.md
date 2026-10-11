@@ -11,9 +11,10 @@ questions.
 - **Where answers go.** Copilot records each answer below, in the next task's PR, and updates the
   matching decision in [DECISIONS.md](DECISIONS.md). The answers you gave after T1 was merged
   (Q-01, Q-06, Q-16 and Q-21) are recorded in the T2 PR. Your answers to Q-22 and Q-23, given when
-  T3 started, are recorded in the T3 PR.
-- **New in T3:** Q-24 and Q-25, both found while verifying T3 and both needed by T8. Of the older
-  questions, Q-09 is the next one needed (by T4).
+  T3 started, and to Q-24, given in its review, are recorded in the T3 PR.
+- **New in T3:** Q-24, Q-25 and Q-26. Q-24 and Q-25 were found while verifying T3; you answered
+  Q-24 in the T3 PR, and T3 applies it. Q-26 was found while applying Q-24. Q-25 and Q-26 are needed
+  by T8. Of the older questions, Q-09 is the next one needed (by T4).
 
 ## Summary
 
@@ -42,8 +43,9 @@ questions.
 | Q-21 | Default branch during the project | T5 | Make `develop-release_1` the default branch from T5 until the release, so weekly and manual runs, Dependabot and the PR template work | **Answered:** default (a), switched by you when T5 merges |
 | Q-22 | How T3 makes comparisons portable to libc++ | T3 | Accept arrays of, and pointers to, the view's own character type by name; keep `noexcept`; reject `nullptr` everywhere | **Answered:** default (D-030) |
 | Q-23 | A misnamed public concept, and three unused ones | T3 | Fix the misnamed one in T3; keep the three unused ones | **Answered:** (a), as Copilot reads your note; please confirm (D-031) |
-| Q-24 | `nullptr` in the comparators and container lookups | T8 | Reject it there too, as D-030 does for the comparison operators | Open |
+| Q-24 | `nullptr` in the comparators and container lookups | T8 | Reject it there too, as D-030 does for the comparison operators | **Answered:** (a), applied in T3 at your request (D-032) |
 | Q-25 | `std::formatter` with libc++ 17 and 18 | T8 | Keep the standard feature test, and document the gap; T8 makes the `std::format` tests impossible to lose silently | Open |
+| Q-26 | `nullptr` in the view's members that mirror `std::basic_string_view` | T8 | Reject it in the 11 overloads where it is always undefined behaviour | Open |
 
 ---
 
@@ -357,6 +359,7 @@ questions.
   pointers to, the view's own character type by name; keep noexcept; reject nullptr everywhere."
   Recorded as D-030. "Everywhere" is applied to the four operators named in the context above.
   The comparators and container lookups, which also accept `nullptr` in C++20 mode, are Q-24.
+  T3 applies Q-24 as well (D-032).
 
 ### Q-23 A misnamed public concept, and three unused ones
 - **Context.** `fixed_string.hpp` (lines 52–63) defines four concepts in the public namespace
@@ -396,7 +399,13 @@ questions.
   - (c) Leave both, and document it. C++23 code is already protected.
 - **When.** In T8, which also runs the suite under the sanitizers, unless you would rather have it
   in the T3 PR.
-- **Answer:** _pending_
+- **Answer (2026-10-11, in the T3 PR):** (a), in T3. In your words: "Why not take care of Q-24 now
+  as part of this PR. Reject nullptr comparisons." Recorded as D-032.
+  - `std::hash<basic_ct_string_view>` is included. It is a hasher for the same lookups, and it
+    accepted `nullptr` in every language version, through its overload for `const char_type*`.
+  - A literal `0` is rejected too.
+  - The view's own members that mirror `std::basic_string_view` are neither comparators nor
+    container lookups. They are Q-26.
 
 ### Q-25 `std::formatter` with libc++ 17 and 18
 - **Context.** `ct_string_view.hpp` provides `std::formatter` only when
@@ -414,4 +423,29 @@ questions.
   - (b) Also provide `std::formatter` with libc++ 17 and 18, by checking the libc++ version. This
     is a vendor-specific check, against the brief's "rely on standard C++" (D-024), and needs a
     suite job with those versions.
+- **Answer:** _pending_
+
+### Q-26 `nullptr` in the view's members that mirror `std::basic_string_view`
+- **Context.** `basic_ct_string_view` offers the search and comparison members of
+  `std::basic_string_view`, with the same overloads. Several take a `const char_type*`. Found while
+  applying Q-24 in T3, and checked with GCC 14 and with Clang 20 + libc++ 20:
+  - In 11 overloads, the pointer is a null-terminated string: `compare(s)`,
+    `compare(pos1, count1, s)`, `starts_with(s)`, `ends_with(s)`, `contains(s)`, and `find`,
+    `rfind`, `find_first_of`, `find_last_of`, `find_first_not_of` and `find_last_not_of` with
+    `(s, pos)`. Passing `nullptr` selects that overload, in every language version, C++23
+    included, since P2166 deleted only the constructor. The call always has undefined behaviour.
+    Exactly the same holds for `std::basic_string_view`. The doc comments already say so.
+  - In the other 8 overloads, the pointer comes with a count, as in `find(s, pos, count)`. There,
+    `nullptr` with a count of 0 is valid, as it is for `std::basic_string_view`. Their doc
+    comments say that a null `s` is always undefined behaviour, which is stricter than the
+    standard. Either option corrects that.
+  - `basic_fixed_string` has no such members.
+- **Options:**
+  - (a) **Recommended.** Reject `nullptr` in the 11 overloads, with a deleted `std::nullptr_t`
+    overload each and compile-time tests, as D-032 does for the container lookups. Leave the 8
+    counted ones as they are. The view then differs from `std::basic_string_view` only by refusing
+    calls that can never be valid. A pointer variable that happens to be null is still undefined
+    behaviour at run time, as with the standard type.
+  - (b) Keep mirroring `std::basic_string_view` exactly, and leave the documentation as it is.
+- **When.** In T8, with Q-25 and the sanitizers, unless you would rather have it in the T3 PR.
 - **Answer:** _pending_

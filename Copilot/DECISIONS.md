@@ -283,7 +283,7 @@ reused, so they may appear out of numeric order.
   - A public concept. It would add a name that Semantic Versioning then freezes after 1.0.
 - **Not covered:** `ctsv_comparators.hpp` and the container lookups take
   `std::basic_string_view`, so they follow its rules: in C++20 mode they still accept `nullptr`
-  (Q-24).
+  (Q-24). D-032, also in T3, makes them reject it.
 
 ### D-031 Public concepts next to `nothrow_convertible_to`: fix the misnamed one, keep all four
 - **Date:** 2026-10-11. **Status:** Proposed. **Related:** T3, Q-23.
@@ -302,6 +302,61 @@ reused, so they may appear out of numeric order.
     meaning its name promised.
   - Removing public names is a larger change than this task needs.
 - **Alternatives:** remove all four before 1.0 (Q-23 b); leave them as they are (Q-23 c).
+
+### D-032 No comparator, hasher or container lookup accepts `nullptr`
+- **Date:** 2026-10-11. **Status:** Proposed. **Related:** T3, Q-24, Q-26, D-030, F-14.
+- **Context:**
+  - D-030 makes the four comparison operators reject `nullptr`. The rest of the library's
+    comparison and lookup code takes, or converts to, `std::basic_string_view`. In C++20,
+    `std::basic_string_view` still converts from `nullptr`; C++23 (P2166) removes that
+    conversion. So in C++20 mode, with libstdc++ 14 and with libc++ 20, these compiled, and the
+    call had undefined behaviour:
+    - the six comparators and two hashers in `ctsv_comparators.hpp`, because `std::nullptr_t`
+      satisfied their concept `ctsv_lookup_key`;
+    - every lookup member of the four containers in `ctsv_containers.hpp`, 40 declarations in all.
+      They take the key as `std_sv_type`, by value. A literal `0` was accepted too.
+  - `std::hash<basic_ct_string_view>` accepted `nullptr` in every language version, C++23
+    included, through its overload for `const char_type*`.
+- **Decision (Q-24, option a, which you asked T3 to apply):**
+  - `ctsv_lookup_key` excludes `std::nullptr_t`, whatever its cv-qualifiers, with the same test as
+    D-030. All the comparators and hashers in `ctsv_comparators.hpp` are constrained on it.
+  - Each of the 40 lookup declarations in the containers gets a deleted twin that takes
+    `std::nullptr_t`, `const`-qualified like the original. `nullptr`, a literal `0` and `NULL`
+    match the twin better than `std_sv_type`, so the call names a deleted function. The compiler
+    then points at a comment block that explains why.
+  - `std::hash<basic_ct_string_view>` gets a deleted `operator()(std::nullptr_t)`. With it, a
+    literal `0` is ambiguous, so it does not compile either.
+  - The inserting members are unchanged. They take `key_type`, which `nullptr` never converted
+    to.
+- **Why:**
+  - The reason of D-030: a lookup with `nullptr` is never meaningful. A compile error replaces
+    undefined behaviour, with every standard library and in every language version.
+  - Deleted overloads leave each lookup's signature, its `noexcept` and the keys it accepts as
+    they were. Turning the 40 lookups into constrained templates would change documented
+    signatures for the same effect.
+  - Because the twin is qualified like the original, it is the best match. The diagnostic then
+    names it, instead of reporting an ambiguity.
+- **Verified (T3):**
+  - Tests first. `tests/cxx20_comparison_checks.cpp` checks every comparator and hasher for all
+    five character types. It does the same for `std::less<>`, `std::equal_to<>` and
+    `std::hash<basic_ct_string_view>`. It also checks every lookup member of the four containers,
+    `const` and not, for all five character types (both flavours with `char`), and for the
+    case-insensitive and `std::less<>` variants. Each check also confirms that the keys that worked
+    before still work.
+  - On the T3 headers without this change, 17 of the 19 new assertions failed in C++20 mode: all
+    those that involve `nullptr`. That held with GCC 14, with Clang 20 + libc++ 20, and with
+    Clang 17 + libc++ 17. In C++23 mode, only the five function-object assertions failed, because
+    of `std::hash`.
+  - The same toolchains as D-030 pass, with `-Werror`. On GCC 14 and Clang 20 (libstdc++, and
+    libc++ 20), all 175 tests pass, and the demo exits with 0.
+- **Alternatives:**
+  - Q-24 (b): reject `nullptr` in the comparators only, and document that the container lookups
+    follow `std::basic_string_view`.
+  - Q-24 (c): change nothing and document it, since C++23 code was already protected, apart from
+    `std::hash`.
+- **Not covered:** the view's members that mirror `std::basic_string_view`: `compare`,
+  `starts_with`, `ends_with`, `contains`, `find` and the other searches. Like the standard's, they
+  take `nullptr` in every language version, through their overloads for `const char_type*` (Q-26).
 
 ---
 

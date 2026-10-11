@@ -15,19 +15,29 @@
 //   * comparing with another character type, with nullptr, or with an operand
 //     whose conversion may throw, does not compile.
 //
+// It also checks that nullptr, and a literal 0, are rejected by the
+// comparators and hashers of ctsv_comparators.hpp, by the std::hash
+// specialization, and by every lookup member of the containers in
+// ctsv_containers.hpp, while every other key still works (decision D-032).
+//
 // Like cxx20_header_smoke.cpp, this TU is part of the C++20-pinned smoke
 // target, so it needs no test framework and runs wherever that target builds.
 // Before T3, the literal, array and pointer checks failed with libc++, whose
-// std::basic_string_view(const CharT*) is not noexcept (FINDINGS F-5).
+// std::basic_string_view(const CharT*) is not noexcept (FINDINGS F-5). C++20
+// is also where std::basic_string_view still converts from nullptr.
 // ---------------------------------------------------------------------------
 #include <ct_str/ct_string_view.hpp>
+#include <ct_str/ctsv_comparators.hpp>
+#include <ct_str/ctsv_containers.hpp>
 #include <ct_str/fixed_string.hpp>
 
 #include <compare>
 #include <concepts>
 #include <cstddef>
+#include <functional>
 #include <string>
 #include <string_view>
+#include <type_traits>
 
 // The same ASCII text, as a literal of character type TChar.
 #define CPS_CMP_LIT(TChar, text) pick<TChar>(text, L##text, u8##text, u##text, U##text)
@@ -277,6 +287,149 @@ namespace
     static_assert(rejects_throwing_conversions<basic_ct_string_view<char, true>>);
     static_assert(rejects_throwing_conversions<basic_ct_string_view<char, false>>);
     static_assert(rejects_throwing_conversions<basic_fixed_string<char, 4>>);
+
+    // -- comparators, hashers and container lookups never take nullptr ---------
+    // They convert their keys to std::basic_string_view, which in C++20 still
+    // converts from nullptr (P2166 removed that in C++23); the call then has
+    // undefined behaviour. None of them accepts nullptr, or a literal 0 (a
+    // common spelling of NULL), on any standard library or language version
+    // (Q-24, D-032). Each check also confirms that every other key still
+    // works, so the rejection is specific to nullptr.
+
+    static_assert(!ctsv_lookup_key<std::nullptr_t, char>);
+    static_assert(!ctsv_lookup_key<const std::nullptr_t, char>);
+    static_assert(!ctsv_lookup_key<std::nullptr_t, char32_t>);
+    static_assert(ctsv_lookup_key<const char*, char>);
+    static_assert(ctsv_lookup_key<const char32_t*, char32_t>);
+
+    /// \p F takes a \p TOther and a \p TKey, in at least one order.
+    template<typename F, typename TOther, typename TKey>
+    concept invocable_either_way = std::invocable<const F&, const TOther&, TKey>
+        || std::invocable<const F&, TKey, const TOther&>;
+
+    /// \p F takes a \p TOther and a \p TKey, in both orders.
+    template<typename F, typename TOther, typename TKey>
+    concept invocable_both_ways = std::invocable<const F&, const TOther&, TKey>
+        && std::invocable<const F&, TKey, const TOther&>;
+
+    /// The comparator \p F compares each key flavor with literals, arrays,
+    /// pointers and strings, but never with nullptr or a literal 0.
+    template<typename F, typename TChar>
+    concept compares_keys_but_not_null =
+        invocable_both_ways<F, basic_ct_string_view<TChar, true>, const TChar (&)[4]>
+        && invocable_both_ways<F, basic_ct_string_view<TChar, true>, const TChar*>
+        && invocable_both_ways<F, basic_ct_string_view<TChar, false>, TChar*>
+        && invocable_both_ways<F, basic_ct_string_view<TChar, false>, const std::basic_string<TChar>&>
+        && invocable_both_ways<F, std::basic_string_view<TChar>, const TChar*>
+        && !invocable_either_way<F, basic_ct_string_view<TChar, true>, std::nullptr_t>
+        && !invocable_either_way<F, basic_ct_string_view<TChar, false>, std::nullptr_t>
+        && !requires (const F& f, const basic_ct_string_view<TChar, true>& key) { f(key, 0); }
+        && !requires (const F& f, const basic_ct_string_view<TChar, true>& key) { f(0, key); };
+
+    /// As compares_keys_but_not_null, and \p F does not compare nullptr with a
+    /// std::basic_string_view either. This does not hold for std::less<> and
+    /// std::equal_to<>: for them that pairing is std::basic_string_view's own
+    /// comparison, which in C++20 still accepts nullptr. The containers never
+    /// pass a comparator nullptr, whatever it is: their lookups reject it.
+    template<typename F, typename TChar>
+    concept never_compares_null = compares_keys_but_not_null<F, TChar>
+        && !invocable_either_way<F, std::basic_string_view<TChar>, std::nullptr_t>;
+
+    /// The hasher \p H hashes literals, arrays, pointers and string views, but
+    /// never nullptr or a literal 0.
+    template<typename H, typename TChar>
+    concept hashes_keys_but_not_null =
+        std::invocable<const H&, const TChar (&)[4]>
+        && std::invocable<const H&, const TChar*>
+        && std::invocable<const H&, TChar*>
+        && std::invocable<const H&, const std::basic_string_view<TChar>&>
+        && !std::invocable<const H&, std::nullptr_t>
+        && !requires (const H& h) { h(0); };
+
+    template<typename TChar>
+    concept every_function_object_rejects_null =
+        never_compares_null<ctsv_less<TChar>, TChar>
+        && never_compares_null<ctsv_ci_less<TChar>, TChar>
+        && never_compares_null<ctsv_equal_to<TChar>, TChar>
+        && never_compares_null<ctsv_ci_equal_to<TChar>, TChar>
+        && never_compares_null<ctsv_three_way<TChar>, TChar>
+        && never_compares_null<ctsv_ci_three_way<TChar>, TChar>
+        && compares_keys_but_not_null<std::less<>, TChar>
+        && compares_keys_but_not_null<std::equal_to<>, TChar>
+        && hashes_keys_but_not_null<ctsv_hash<TChar>, TChar>
+        && hashes_keys_but_not_null<ctsv_ci_hash<TChar>, TChar>
+        && hashes_keys_but_not_null<std::hash<basic_ct_string_view<TChar, true>>, TChar>
+        && hashes_keys_but_not_null<std::hash<basic_ct_string_view<TChar, false>>, TChar>;
+
+    static_assert(every_function_object_rejects_null<char>);
+    static_assert(every_function_object_rejects_null<wchar_t>);
+    static_assert(every_function_object_rejects_null<char8_t>);
+    static_assert(every_function_object_rejects_null<char16_t>);
+    static_assert(every_function_object_rejects_null<char32_t>);
+
+    /// Every lookup member of the container \p C takes a const \p TKey lvalue.
+    /// Only the ordered containers have lower_bound and upper_bound, only the
+    /// maps have at and at_if, and erase needs a non-const container.
+    template<typename C, typename TKey, bool ORDERED, bool MAP>
+    concept looks_up_with = requires (C& c, const TKey& key)
+        {
+            c.find(key);
+            c.contains(key);
+            c.count(key);
+            c.equal_range(key);
+        }
+        && (!ORDERED || requires (C& c, const TKey& key) { c.lower_bound(key); c.upper_bound(key); })
+        && (!MAP || requires (C& c, const TKey& key) { c.at(key); c.at_if(key); })
+        && (std::is_const_v<C> || requires (C& c, const TKey& key) { c.erase(key); });
+
+    /// Some member of the container \p C takes nullptr or a literal 0 as a key.
+    /// A member that \p C does not have takes nothing.
+    template<typename C>
+    concept some_lookup_takes_null =
+        requires (C& c) { c.find(nullptr); } || requires (C& c) { c.find(0); }
+        || requires (C& c) { c.contains(nullptr); } || requires (C& c) { c.contains(0); }
+        || requires (C& c) { c.count(nullptr); } || requires (C& c) { c.count(0); }
+        || requires (C& c) { c.equal_range(nullptr); } || requires (C& c) { c.equal_range(0); }
+        || requires (C& c) { c.lower_bound(nullptr); } || requires (C& c) { c.lower_bound(0); }
+        || requires (C& c) { c.upper_bound(nullptr); } || requires (C& c) { c.upper_bound(0); }
+        || requires (C& c) { c.at(nullptr); } || requires (C& c) { c.at(0); }
+        || requires (C& c) { c.at_if(nullptr); } || requires (C& c) { c.at_if(0); }
+        || requires (C& c) { c.erase(nullptr); } || requires (C& c) { c.erase(0); };
+
+    /// The container \p C, const or not, looks up every key kind, and never
+    /// nullptr or a literal 0.
+    template<typename C, typename TChar, bool ORDERED, bool MAP>
+    concept looks_up_every_key_but_null =
+        looks_up_with<C, TChar[4], ORDERED, MAP>
+        && looks_up_with<C, const TChar*, ORDERED, MAP>
+        && looks_up_with<C, TChar*, ORDERED, MAP>
+        && looks_up_with<C, std::basic_string_view<TChar>, ORDERED, MAP>
+        && looks_up_with<C, std::basic_string<TChar>, ORDERED, MAP>
+        && looks_up_with<C, basic_fixed_string<TChar, 4>, ORDERED, MAP>
+        && looks_up_with<C, basic_ct_string_view<TChar, true>, ORDERED, MAP>
+        && looks_up_with<C, basic_ct_string_view<TChar, false>, ORDERED, MAP>
+        && looks_up_with<const C, const TChar*, ORDERED, MAP>
+        && !some_lookup_takes_null<C>
+        && !some_lookup_takes_null<const C>;
+
+    template<typename TChar, bool VALID_CSTR>
+    concept every_container_rejects_null =
+        looks_up_every_key_but_null<basic_ctsv_map<TChar, VALID_CSTR, int>, TChar, true, true>
+        && looks_up_every_key_but_null<basic_ctsv_set<TChar, VALID_CSTR>, TChar, true, false>
+        && looks_up_every_key_but_null<basic_ctsv_unordered_map<TChar, VALID_CSTR, int>, TChar, false, true>
+        && looks_up_every_key_but_null<basic_ctsv_unordered_set<TChar, VALID_CSTR>, TChar, false, false>;
+
+    static_assert(every_container_rejects_null<char, true>);
+    static_assert(every_container_rejects_null<char, false>);
+    static_assert(every_container_rejects_null<wchar_t, true>);
+    static_assert(every_container_rejects_null<char8_t, false>);
+    static_assert(every_container_rejects_null<char16_t, true>);
+    static_assert(every_container_rejects_null<char32_t, false>);
+
+    // The case-insensitive containers, and an ordered map using std::less<>.
+    static_assert(looks_up_every_key_but_null<ct_cstring_view_ci_map<int>, char, true, true>);
+    static_assert(looks_up_every_key_but_null<ct_cstring_view_ci_unordered_set, char, false, false>);
+    static_assert(looks_up_every_key_but_null<basic_ctsv_map<char, true, int, std::less<>>, char, true, true>);
 }
 
 #undef CPS_CMP_LIT

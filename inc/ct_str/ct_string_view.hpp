@@ -5,6 +5,7 @@
 #ifndef CSTR_VIEW_CT_STRING_VIEW_HPP
 #define CSTR_VIEW_CT_STRING_VIEW_HPP
 #include "fixed_string.hpp"
+#include <cstddef>
 #include <string>
 #include <string_view>
 #include <ostream>
@@ -773,6 +774,11 @@ struct std::hash<cps::ct_string::basic_ct_string_view<TChar, VALID_CSTR>>
     {
         return std::hash<sv_type>{}(v);
     }
+
+    /// \brief nullptr is never a key (D-032). Without this, nullptr would
+    /// select the pointer overload above, with undefined behavior, in every
+    /// language version.
+    std::size_t operator()(std::nullptr_t) const = delete;
 };
 
 
