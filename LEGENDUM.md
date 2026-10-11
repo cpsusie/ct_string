@@ -489,7 +489,11 @@ auto d = std::format("{:.3}",    "hello"_ctsv);  // "hel"
 auto w = std::format(L"{}",      cps::ct_string::make_ctsv<L"wide">()); // L"wide"
 ```
 
-Si `<fmt/format.h>` in via capitum est, `fmt::format(...)` eadem ratione operatur. Fmt a te includi non necesse est, neque refert quo ordine capita includantur: `<ct_str/ct_string_view.hpp>` enim fmt per `__has_include` deprehendit suaque sponte includit. Quod ubi fecit, macro `CPS_CT_STRING_VIEW_HAS_FMT` definit; si etiam `<fmt/xchar.h>`, quo `wchar_t` eget, invenit, id quoque includit atque macro `CPS_CT_STRING_VIEW_HAS_WFMT` definit.
+Si `<fmt/format.h>` in via capitum est, `fmt::format(...)` eadem ratione operatur. Fmt separatim includi necesse non est: caput `<ct_str/ct_string_view.hpp>` illud per `__has_include` deprehendit suaque sponte includit. Quo facto, macro `CPS_CT_STRING_VIEW_HAS_FMT` definitur.
+
+Caput `<fmt/xchar.h>` ad series characterum latorum (`wchar_t`) formatandas necessarium est. Quo invento atque incluso, macro `CPS_CT_STRING_VIEW_HAS_WFMT` definitur.
+
+Quo ordine capita includantur, nihil refert; nec ullum macro manu definiendum est.
 
 ---
 
@@ -839,7 +843,7 @@ quod `<ct_str/fixed_string.hpp>` quoque includit.
 
 ### `{fmt}` si desideratur
 
-Si `<fmt/format.h>` in via capitum inveniri potest, `<ct_str/ct_string_view.hpp>` id per `__has_include` deprehendit, includit, specialitatemque `fmt::formatter` pro `basic_ct_string_view` sponte efficit. Nihil refert quo ordine capita includantur, neque macro additum ab usuario requiritur.
+Caput `<ct_str/ct_string_view.hpp>` capita fmt per `__has_include` deprehendit suaque sponte includit. Ad speciem `char` `basic_ct_string_view` per `fmt::formatter` formatandam `<fmt/format.h>` requiritur; ad speciem `wchar_t`, etiam `<fmt/xchar.h>`. Cetera in [Usu V](#usus-v-formatio).
 
 ### Probationes
 
