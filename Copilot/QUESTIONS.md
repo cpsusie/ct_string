@@ -8,36 +8,39 @@ questions.
 - **Unanswered questions.** The default is a working assumption only. If a question is still open
   when the task in its "Needed by" column starts, Copilot asks again in that task's PR before
   relying on the default.
-- **Where answers go.** Copilot records each answer below and updates the matching decision in
-  [DECISIONS.md](DECISIONS.md). Answers given while you review this PR (T1) are recorded in the T2
-  PR, so T1 can be merged while questions are still open.
-- **None of these blocks the next task (T2).**
+- **Where answers go.** Copilot records each answer below, in the next task's PR, and updates the
+  matching decision in [DECISIONS.md](DECISIONS.md). The answers you gave after T1 was merged
+  (Q-01, Q-06, Q-16 and Q-21) are recorded in the T2 PR.
+- **New in T2:** Q-22 and Q-23, both about T3. Each has a default, so neither blocks T3. Of the
+  older questions, Q-09 is the next one needed (by T4).
 
 ## Summary
 
-| ID | Topic | Needed by | Recommended default |
-|---|---|---|---|
-| Q-01 | Package, CMake and target names | T4 | vcpkg `ct-string`, Conan `ct_string`, CMake `find_package(ct_string)` → `ct_string::ct_string`, `cstr_view` kept as an alias, option prefix `CT_STRING_` |
-| Q-02 | Include directory, macro prefix, include guards | T9 | Keep `ct_str/`; new macros use `CPS_CT_STRING_`; make include guards consistent |
-| Q-03 | Version of the first public release | T14 | `1.0.0`, preceded by a `v1.0.0-rc.1` pre-release that dry-runs the release pipeline |
-| Q-04 | GCC floor to advertise | T6 | GCC 11.1 (tested); 10.x is impossible |
-| Q-05 | Clang floor | T6 | Clang 17, no workarounds |
-| Q-06 | MSVC toolsets to test | T7 | Every toolset from 14.29 (VS 2019 16.11) to the newest, on every PR; you decide before any is dropped |
-| Q-07 | macOS / AppleClang | T8 | Yes: after the libc++ fix, add a macOS arm64 job |
-| Q-08 | Meaning of "separate test-suite packages" | T10 | In-repo vcpkg manifest and Conan recipe for the test suite; not published to the registries |
-| Q-09 | CMake minimum | T4 | 3.21 minimum, newest tested 4.x as the policy maximum |
-| Q-10 | fmt opt-in/opt-out | T11 | Keep auto-detection by default; add a force on/off switch; package managers default to off |
-| Q-11 | Release and branch flow | T15 | You promote `develop-release_1` into `main` (merge commit) and push tag `vX.Y.Z` there → workflow publishes; pre-release tags go on `develop-release_1` |
-| Q-12 | Who submits to vcpkg and ConanCenter | T19 | You, using files and steps Copilot prepares |
-| Q-13 | Which new documents need Latin | T14 | Only README and LEGENDUM are bilingual; everything else is English |
-| Q-14 | Code formatter (clang-format) | T5 | Not before 1.0; revisit afterwards |
-| Q-15 | Role of `test_console_app` | T10 | A demo that checks itself: move it to `examples/`, behind an option; CI builds and runs it |
-| Q-16 | GitHub repository settings | T5 | Two rulesets requiring the one `ci-ok` check: `develop-release_1` (up to date, squash) and `main` (merge commit); delete merged branches; Dependabot security PRs off |
-| Q-17 | CI budget and Docker Hub | T6 | Full matrix (about 50 jobs) on every PR and push; anonymous pulls of the official `gcc` images |
-| Q-18 | CPU architectures | T6 | x64 everywhere, plus one Linux arm64 job (GCC 14, full suite) |
-| Q-19 | Community files and documentation hosting | T17 | Add CONTRIBUTING and SECURITY files and issue templates; no separate docs site |
-| Q-20 | Visual Studio flags for the C++23 suite | T7 | "/cpplang" means `/std:c++latest`; VS 2026 required, VS 2022 17.14 best-effort |
-| Q-21 | Default branch during the project | T5 | Make `develop-release_1` the default branch from T5 until the release, so weekly and manual runs, Dependabot and the PR template work |
+| ID | Topic | Needed by | Recommended default | Status |
+|---|---|---|---|---|
+| Q-01 | Package, CMake and target names | T4 | vcpkg `ct-string`, Conan `ct_string`, CMake `find_package(ct_string)` → `ct_string::ct_string`, `cstr_view` kept as an alias, option prefix `CT_STRING_` | **Answered:** default |
+| Q-02 | Include directory, macro prefix, include guards | T9 | Keep `ct_str/`; new macros use `CPS_CT_STRING_`; make include guards consistent | Open |
+| Q-03 | Version of the first public release | T14 | `1.0.0`, preceded by a `v1.0.0-rc.1` pre-release that dry-runs the release pipeline | Open |
+| Q-04 | GCC floor to advertise | T6 | GCC 11.1 (tested); 10.x is impossible | Open |
+| Q-05 | Clang floor | T6 | Clang 17, no workarounds | Open |
+| Q-06 | MSVC toolsets to test | T7 | Every toolset from 14.29 (VS 2019 16.11) to the newest, on every PR; you decide before any is dropped | **Answered:** default |
+| Q-07 | macOS / AppleClang | T8 | Yes: after the libc++ fix, add a macOS arm64 job | Open |
+| Q-08 | Meaning of "separate test-suite packages" | T10 | In-repo vcpkg manifest and Conan recipe for the test suite; not published to the registries | Open |
+| Q-09 | CMake minimum | T4 | 3.21 minimum, newest tested 4.x as the policy maximum | Open |
+| Q-10 | fmt opt-in/opt-out | T11 | Keep auto-detection by default; add a force on/off switch; package managers default to off | Open |
+| Q-11 | Release and branch flow | T15 | You promote `develop-release_1` into `main` (merge commit) and push tag `vX.Y.Z` there → workflow publishes; pre-release tags go on `develop-release_1` | Open |
+| Q-12 | Who submits to vcpkg and ConanCenter | T19 | You, using files and steps Copilot prepares | Open |
+| Q-13 | Which new documents need Latin | T14 | Only README and LEGENDUM are bilingual; everything else is English | Open |
+| Q-14 | Code formatter (clang-format) | T5 | Not before 1.0; revisit afterwards | Open |
+| Q-15 | Role of `test_console_app` | T10 | A demo that checks itself: move it to `examples/`, behind an option; CI builds and runs it | Open |
+| Q-16 | GitHub repository settings | T5 | Two rulesets requiring the one `ci-ok` check: `develop-release_1` (up to date, squash) and `main` (merge commit); delete merged branches; Dependabot security PRs off | **Answered:** default, applied by you after T5 |
+| Q-17 | CI budget and Docker Hub | T6 | Full matrix (about 50 jobs) on every PR and push; anonymous pulls of the official `gcc` images | Open |
+| Q-18 | CPU architectures | T6 | x64 everywhere, plus one Linux arm64 job (GCC 14, full suite) | Open |
+| Q-19 | Community files and documentation hosting | T17 | Add CONTRIBUTING and SECURITY files and issue templates; no separate docs site | Open |
+| Q-20 | Visual Studio flags for the C++23 suite | T7 | "/cpplang" means `/std:c++latest`; VS 2026 required, VS 2022 17.14 best-effort | Open |
+| Q-21 | Default branch during the project | T5 | Make `develop-release_1` the default branch from T5 until the release, so weekly and manual runs, Dependabot and the PR template work | **Answered:** default (a), switched by you when T5 merges |
+| Q-22 | How T3 makes comparisons portable to libc++ | T3 | Accept arrays of, and pointers to, the view's own character type by name; keep `noexcept`; reject `nullptr` everywhere | Open |
+| Q-23 | A misnamed public concept, and three unused ones | T3 | Fix the misnamed one in T3; keep the three unused ones | Open |
 
 ---
 
@@ -63,7 +66,9 @@ questions.
   - Keep `cstr_view` as an alias target so that existing in-tree users keep building.
   - If vcpkg maintainers think `ct-string` is ambiguous, fall back to `cpsusie-ct-string`. Their
     guide explicitly accepts the owner-plus-repository form.
-- **Answer:** _pending_
+- **Answer (2026-10-11, in reply to T1):** the recommendation is accepted: "package, CMake and
+  target names. (accept defaults)". D-019 is now accepted. T4 renames the CMake project and adds
+  the `CT_STRING_` options; T9 exports `ct_string::ct_string`.
 
 ### Q-02 Include directory, macro prefix and include guards
 - **Context.**
@@ -120,7 +125,9 @@ questions.
     are faster, but a problem with a toolset in between is found just after merging, not before.
   - (c) VS 2022 (v143) and later, newest version of each Visual Studio only. Cheapest, but it does
     not meet the brief's "any version".
-- **Answer:** _pending_
+- **Answer (2026-10-11, in reply to T1):** option (a): "Yes, accept defaults". D-009 is now
+  accepted. T7 still measures the cost; if the sweep makes PR runs much slower, T7's PR asks you
+  again before switching to (b).
 
 ### Q-07 macOS / AppleClang in scope?
 - **Context.**
@@ -243,7 +250,10 @@ questions.
     after a promotion (FINDINGS F-12).
   - Dependabot: alerts on, automatic security-update PRs off (D-012).
   - No merge queue: with one PR at a time it adds nothing over the up-to-date rule.
-- **Answer:** _pending_
+- **Answer (2026-10-11, in reply to T1):** the recommendation is accepted, to be applied after T5:
+  "Yes, after after T5. (accept defaults)". You apply the settings once T5 is merged, using the
+  click-by-click steps in T5's PR. The `ci-ok` check they require exists only from T5 on. D-003,
+  D-012 and D-013 already assume these settings.
 
 ### Q-17 CI budget and Docker Hub
 - **Context.**
@@ -300,4 +310,58 @@ questions.
     unreleased work.
   - (c) Keep `main` as the default, and accept that the features above start only at the release.
     PR and push CI still runs from T5.
+- **Answer (2026-10-11, in reply to T1):** option (a): "make develop-release_1 the default branch
+  from T5 until the release. (yes please do this)". D-028 is now accepted.
+  - Copilot cannot change repository settings: it can only push branches to this repository. So
+    **you** make the switch, when T5 is merged. T5's PR gives the steps, and T18's PR gives the
+    steps for switching back to `main` at the release.
+  - Until T5 is merged, nothing changes: `main` stays the default.
+
+### Q-22 How T3 makes comparisons portable to libc++
+- **Context.** With libc++, comparing a view or a fixed string with a string literal, an array or a
+  pointer does not compile (FINDINGS F-5).
+  - The cause is four operator templates, `operator==` and `operator<=>` in `basic_ct_string_view`
+    and in `basic_fixed_string`. They accept only operands that are *nothrow*-convertible to the
+    string view.
+  - Literals, arrays and pointers convert through `std::basic_string_view`'s constructor from a
+    pointer. The standard does not make that constructor `noexcept`, since it has a precondition:
+    the string must end in a null. libstdc++ and the MSVC STL add `noexcept` anyway, but libc++
+    does not.
+  - Of the operand kinds the documentation lists, only these depend on the standard library.
+    `std::basic_string`'s conversion is `noexcept` in the standard itself, and the library's own
+    types convert with `noexcept`.
+  - `nullptr` differs by library too. `view == nullptr` compiles with libstdc++ in C++20 mode, and
+    then has undefined behaviour at run time. C++23 (P2166) and libc++ reject it. This was checked
+    with GCC 14 and Clang 20.
+- **Options:**
+  - (a) **Recommended.** Keep today's rule, and also accept arrays of, and pointers to, the view's
+    own character type, by name.
+    - The operators stay unconditionally `noexcept`, which is accurate: the conversion cannot
+      throw.
+    - The accepted operands and `noexcept` are then the same on every standard library, once
+      `nullptr` is rejected too (below).
+    - A throwaway prototype of this option compiled the C++20 smoke check with libc++ 17 and 20.
+      With libc++ 20, all 160 tests passed, and so did the demo with fmt used header-only.
+      PLAN.md (T3) has the details.
+  - (b) Accept anything convertible to the string view, with a `noexcept` that depends on the
+    conversion. `ctsv_comparators.hpp` already does this for its lookup keys. It is simpler, but:
+    - `noexcept(view == "x")` would be false with libc++ only;
+    - types whose conversion can throw would become comparable on every library;
+    - `view == nullptr` would also start compiling with libc++ in C++20 mode, unless excluded.
+- **Also recommended, with either option:** reject `nullptr` on every library and language
+  version, since comparing with it is never valid.
+- **Answer:** _pending_. T3's PR logs the result as a decision.
+
+### Q-23 A misnamed public concept, and three unused ones
+- **Context.** `fixed_string.hpp` (lines 52–63) defines four concepts in the public namespace
+  `cps::ct_string`. Nothing in the library, the tests or the demo uses them, except that one is
+  defined in terms of another.
+  - One of them, `not_exact_same_nothrow_convertible_to`, does not check `noexcept`, despite its
+    name. It is identical to `not_exact_same_convertible_to`.
+  - After 1.0, Semantic Versioning makes changing or removing a public name a breaking change.
+- **Options:**
+  - (a) **Recommended.** In T3, which changes the code right next to them, make the misnamed one
+    check `noexcept` as its name says, with a compile-time test. Keep the other three.
+  - (b) Remove all four before 1.0.
+  - (c) Leave them as they are.
 - **Answer:** _pending_

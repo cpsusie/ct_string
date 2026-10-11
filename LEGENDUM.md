@@ -489,7 +489,7 @@ auto d = std::format("{:.3}",    "hello"_ctsv);  // "hel"
 auto w = std::format(L"{}",      cps::ct_string::make_ctsv<L"wide">()); // L"wide"
 ```
 
-Si `<fmt/format.h>` ante `<ct_str/ct_string_view.hpp>` includitur, `fmt::format(...)` eadem ratione operatur. Praesentia per `__has_include` deprehenditur atque macro `CJM_CT_STRING_VIEW_HAS_FMT` regitur.
+Si `<fmt/format.h>` in via capitum est, `fmt::format(...)` eadem ratione operatur. Fmt a te includi non necesse est, neque refert quo ordine capita includantur: `<ct_str/ct_string_view.hpp>` enim fmt per `__has_include` deprehendit suaque sponte includit. Quod ubi fecit, macro `CPS_CT_STRING_VIEW_HAS_FMT` definit; si etiam `<fmt/xchar.h>`, quo `wchar_t` eget, invenit, id quoque includit atque macro `CPS_CT_STRING_VIEW_HAS_WFMT` definit.
 
 ---
 
@@ -839,7 +839,7 @@ quod `<ct_str/fixed_string.hpp>` quoque includit.
 
 ### `{fmt}` si desideratur
 
-Si `<fmt/format.h>` inveniri potest atque ante `<ct_str/ct_string_view.hpp>` includitur — vel per `__has_include` deprehenditur — specialitas `fmt::formatter` pro `basic_ct_string_view` sponte efficitur. Macro additum ab usuario non requiritur.
+Si `<fmt/format.h>` in via capitum inveniri potest, `<ct_str/ct_string_view.hpp>` id per `__has_include` deprehendit, includit, specialitatemque `fmt::formatter` pro `basic_ct_string_view` sponte efficit. Nihil refert quo ordine capita includantur, neque macro additum ab usuario requiritur.
 
 ### Probationes
 

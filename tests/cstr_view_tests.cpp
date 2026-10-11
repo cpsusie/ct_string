@@ -1177,8 +1177,16 @@ TEST(CtSvFormatter, WideWidthAlignPrecision)
 // ============================================================
 //  fmt::formatter (only if {fmt} is available)
 // ============================================================
+//
+// These tests compile only when <ct_str/ct_string_view.hpp> detects {fmt}.
+// They were once compiled out, with no visible failure, because they tested a
+// stale macro name. The build now says that it links {fmt}
+// (CPS_CT_STRING_TESTS_EXPECT_FMT, set in CMakeLists.txt). Each #elif below
+// is the "else" of the very condition that guards the tests, so if that
+// condition is false while {fmt} is expected -- whether the header did not
+// find {fmt} or the macro names disagree -- compilation stops.
 
-#if defined(CJM_CT_STRING_VIEW_HAS_FMT)
+#if defined(CPS_CT_STRING_VIEW_HAS_FMT)
 
 TEST(CtSvFmtFormatter, BasicNarrow)
 {
@@ -1200,6 +1208,26 @@ TEST(CtSvFmtFormatter, NarrowNonCstrFlavor)
     EXPECT_EQ(fmt::format("{}", part), "hello");
 }
 
-#endif // CJM_CT_STRING_VIEW_HAS_FMT
+#elif defined(CPS_CT_STRING_TESTS_EXPECT_FMT)
+#  error "The build links {fmt}, yet the CtSvFmtFormatter tests were compiled out: either <ct_str/ct_string_view.hpp> did not find <fmt/format.h>, or the #if guarding these tests does not test the macro the header defines (CPS_CT_STRING_VIEW_HAS_FMT)."
+#endif // CPS_CT_STRING_VIEW_HAS_FMT
+
+#if defined(CPS_CT_STRING_VIEW_HAS_WFMT)
+
+TEST(CtSvFmtFormatter, WideBasicSpecAndNonCstrFlavor)
+{
+    static constexpr auto wv   = make_ctsv<L"hello">();
+    static constexpr auto part = wv.substr(1, 3);   // ct_wstring_view
+    static_assert(std::is_same_v<std::remove_cvref_t<decltype(part)>, ct_wstring_view>);
+    EXPECT_EQ(fmt::format(L"{}", wv), std::wstring{L"hello"});
+    EXPECT_EQ(fmt::format(L"[{:>8}]", wv), std::wstring{L"[   hello]"});
+    EXPECT_EQ(fmt::format(L"[{:*<7}]", wv), std::wstring{L"[hello**]"});
+    EXPECT_EQ(fmt::format(L"{:.3}", wv), std::wstring{L"hel"});
+    EXPECT_EQ(fmt::format(L"{}", part), std::wstring{L"ell"});
+}
+
+#elif defined(CPS_CT_STRING_TESTS_EXPECT_FMT)
+#  error "The build links {fmt}, yet the wide CtSvFmtFormatter test was compiled out: either <ct_str/ct_string_view.hpp> did not find <fmt/xchar.h> (fmt 8 or later), or the #if guarding this test does not test the macro the header defines (CPS_CT_STRING_VIEW_HAS_WFMT)."
+#endif // CPS_CT_STRING_VIEW_HAS_WFMT
 
 

@@ -77,6 +77,10 @@ add_executable(cstr_view_tests
 )
 target_link_libraries(cstr_view_tests PRIVATE cstr_view GTest::gtest GTest::gtest_main fmt::fmt-header-only ct_str_warnings)
 target_compile_features(cstr_view_tests PRIVATE cxx_std_23)
+# The tests always link {fmt}, so the header must detect it. Saying so lets
+# tests/cstr_view_tests.cpp fail to compile, with a clear message, instead of
+# silently skipping its fmt::formatter tests.
+target_compile_definitions(cstr_view_tests PRIVATE CPS_CT_STRING_TESTS_EXPECT_FMT)
 
 enable_testing()
 add_test(NAME cstr_view_tests COMMAND cstr_view_tests)

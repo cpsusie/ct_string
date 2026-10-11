@@ -7,10 +7,11 @@ This file records every project decision and the reason for it, as the brief
 **Statuses**
 
 - **Proposed:** written by Copilot. It becomes **Accepted** when you merge the PR that contains it,
-  unless it is marked *pending*.
+  unless it is marked *pending*. The next task's PR then updates the status here.
 - **Pending Q-nn:** waits on your answer to that question in [QUESTIONS.md](QUESTIONS.md). Until
   then, the recommended default shown is only a working assumption. Your answer may change the
-  decision.
+  decision. When only some items of a decision depend on the question, just those items are marked
+  *pending Q-nn*; the rest is accepted.
 - **Accepted:** approved by you.
 - **Superseded by D-nnn:** replaced by a later decision. Entries are never deleted, only
   superseded, so the history stays readable.
@@ -24,7 +25,7 @@ reused, so they may appear out of numeric order.
 ## Process
 
 ### D-001 Planning documents live in `Copilot/` and are updated in every PR
-- **Date:** 2026-10-10. **Status:** Proposed. **Related:** T1, all tasks.
+- **Date:** 2026-10-10. **Status:** Accepted (T1, PR #14). **Related:** T1, all tasks.
 - **Context:** The brief asks for decisions and their reasons to be tracked in markdown under
   `Copilot/`, and for the following tasks to be planned at the end of each task.
 - **Decision:**
@@ -42,7 +43,7 @@ reused, so they may appear out of numeric order.
   - One large document: hard to review in small PRs.
 
 ### D-002 Rolling-wave planning with re-plan checkpoints
-- **Date:** 2026-10-10. **Status:** Proposed. **Related:** all tasks.
+- **Date:** 2026-10-10. **Status:** Accepted (T1, PR #14). **Related:** all tasks.
 - **Context:** The brief asks for a concrete plan that can still adapt to new priorities, with the
   following tasks planned at the end of each task or milestone.
 - **Decision:**
@@ -56,7 +57,8 @@ reused, so they may appear out of numeric order.
 - **Alternative:** Detail every task now. That is brittle and creates rework.
 
 ### D-003 Branch and PR workflow
-- **Date:** 2026-10-10. **Status:** Proposed. **Related:** all tasks, D-026, Q-11, Q-16.
+- **Date:** 2026-10-10. **Status:** Accepted (T1, PR #14).
+  **Related:** all tasks, D-026, Q-11, Q-16.
 - **Decision:**
   - Every task branches from the latest `develop-release_1`, and its PR targets `develop-release_1`.
   - One Copilot task PR is open at a time. Your promotion PRs and Dependabot's PRs are outside this
@@ -76,9 +78,12 @@ reused, so they may appear out of numeric order.
   Promotion PRs need a merge commit instead. A squashed promotion would give `main` and
   `develop-release_1` different histories, and every later promotion would conflict. The choice is
   yours, since you merge.
+  - **Update (2026-10-11):** you accepted Q-16, so from T5 on the rulesets enforce this: squash
+    only into `develop-release_1`, merge commits only into `main`. Until then, task PRs can be
+    merged either way.
 
 ### D-004 The Task 1 PR changes documentation only, and README/LEGENDUM stay unchanged
-- **Date:** 2026-10-10. **Status:** Proposed. **Related:** T1, D-025.
+- **Date:** 2026-10-10. **Status:** Accepted (T1, PR #14). **Related:** T1, D-025.
 - **Context:** The brief says any work should update README.md and LEGENDUM.md in the same style.
 - **Decision:**
   - Task 1 adds only the planning documents in `Copilot/`.
@@ -88,7 +93,8 @@ reused, so they may appear out of numeric order.
 - **Why:** The plan is internal project management. Users of the library see no difference.
 
 ### D-023 Fix the defects found during planning before building CI on top of them
-- **Date:** 2026-10-10. **Status:** Proposed. **Related:** T2, T3, findings F-4 and F-5.
+- **Date:** 2026-10-10. **Status:** Accepted (T1, PR #14).
+  **Related:** T2, T3, findings F-4 and F-5.
 - **Decision:**
   - The two code defects found while planning are milestone M1, one PR each, with tests and docs:
     - the stale `CJM_` test macro;
@@ -104,7 +110,7 @@ reused, so they may appear out of numeric order.
 ## Supported toolchains
 
 ### D-005 Enforce the C++20 floor with the C++20-pinned smoke target in CI
-- **Date:** 2026-10-10. **Status:** Proposed. **Related:** T4, T6, T7, T8, F-1, F-2.
+- **Date:** 2026-10-10. **Status:** Accepted (T1, PR #14). **Related:** T4, T6, T7, T8, F-1, F-2.
 - **Decision:**
   - The library stays C++20.
   - The existing `cstr_view_cxx20_smoke` target, pinned to C++20 and including every header, is the
@@ -140,26 +146,28 @@ reused, so they may appear out of numeric order.
 - **Alternative:** Support Clang 16 with a targeted workaround. Possible if you want it (Q-05).
 
 ### D-008 Toolchains for the full C++23 test suite
-- **Date:** 2026-10-10. **Status:** Proposed. **Related:** T6, T7, F-3, Q-20.
+- **Date:** 2026-10-10. **Status:** Accepted (T1, PR #14), except the items marked *pending Q-20*.
+  **Related:** T6, T7, F-3, Q-20.
 - **Decision:**
   - CI runs the full suite and the demo on GCC 14 and 15.
   - Also on Clang 19, 20, 21 and 22 with libstdc++.
-  - Also on the newest MSVC (VS 2026) and the clang-cl bundled with VS 2026.
+  - Also on the newest MSVC (VS 2026) and the clang-cl bundled with VS 2026 (*pending Q-20*).
   - The suite is also run on VS 2022 17.14 for as long as it passes there; that is a goal, not a
-    promise.
+    promise (*pending Q-20*).
   - GCC 13 currently passes too, but is not promised.
 - **Why:** These are the brief's stated floors, confirmed by the probe (F-3). Promising less than
   what happens to work keeps the test project free to use newer C++23 features.
 
 ### D-009 MSVC: test every toolset from 14.29 (VS 2019 16.11) to the newest
-- **Date:** 2026-10-10. **Status:** Pending Q-06. **Related:** T7, F-8, F-13.
+- **Date:** 2026-10-10. **Status:** Accepted: Q-06 answered with option (a) on 2026-10-11.
+- **Related:** T7, F-8, F-13.
 - **Context:**
   - The brief asks CI to enforce every MSVC that fully or nearly fully supports C++20.
   - That is VS 2019 16.11 (MSVC 14.29, v142) and every later toolset: 14.30–14.44 (VS 2022) and
     14.5x (VS 2026).
   - The runners preinstall only 14.44 and 14.5x. Every toolset from 14.29 to 14.43 can be installed
     side by side during a job (F-13).
-- **Decision (default):**
+- **Decision:**
   - Build the C++20 smoke check with **every** toolset: 14.29, each VS 2022 minor version from 14.30
     to 14.44, and VS 2026's 14.5x. Later VS 2026 versions join as they ship.
   - These jobs run on every PR and push, and the required check covers them (D-013).
@@ -176,18 +184,19 @@ reused, so they may appear out of numeric order.
   versions in between. Both are cheaper, but leave toolsets the brief covers untested.
 
 ### D-010 clang-cl: every Clang major from the library's floor, each with an STL that accepts it
-- **Date:** 2026-10-10. **Status:** Proposed. **Related:** T7, F-9, F-13, D-015.
+- **Date:** 2026-10-10. **Status:** Accepted (T1, PR #14), except the items marked *pending*.
+  **Related:** T7, F-9, F-13, D-007, D-015, Q-05, Q-20.
 - **Decision:**
   - CI builds the C++20 smoke check with clang-cl, in one job per Clang major from **17** (the
-    library's floor) to the newest (**22** today). Each job is pinned to its major and paired with
-    an MSVC STL that accepts it (F-9):
+    library's floor, set by D-007: *pending Q-05*) to the newest (**22** today). Each job is
+    pinned to its major and paired with an MSVC STL that accepts it (F-9):
     - Clang 17 with the 14.42 STL;
     - Clang 18 with the 14.43 STL;
     - Clang 19 and later with the 14.44 STL.
   - Majors already on the runner are used as installed. The others come from official LLVM
     releases (D-015). New majors are added as they are released.
   - CI also builds it with the clang-cl **bundled** with VS 2022 17.14 and with VS 2026.
-  - The full suite and the demo run with the clang-cl bundled with VS 2026.
+  - The full suite and the demo run with the clang-cl bundled with VS 2026 (*pending Q-20*).
 - **Why:**
   - The brief asks for the same coverage as MSVC.
   - The MSVC STL sets its own minimum Clang (F-9). Pairing each Clang with an STL that accepts it
@@ -198,7 +207,7 @@ reused, so they may appear out of numeric order.
   would go untested on Windows.
 
 ### D-024 libc++ incompatibility is a bug, fixed whatever the macOS scope
-- **Date:** 2026-10-10. **Status:** Proposed. **Related:** T3, T8, F-5, Q-07.
+- **Date:** 2026-10-10. **Status:** Accepted (T1, PR #14). **Related:** T3, T8, F-5, Q-07, Q-22.
 - **Decision:**
   - Fix the comparison operators so they compile with any conforming standard library, keeping
     their meaning and an accurate `noexcept`.
@@ -208,13 +217,57 @@ reused, so they may appear out of numeric order.
   - The current code depends on a vendor-specific `noexcept` strengthening, which contradicts the
     brief's "rely on standard C++".
   - It blocks every libc++ user, including Conan profiles that use libc++.
+- **How:** the design is Q-22. T3's PR records it as a new decision.
+
+---
+
+## Testing
+
+### D-029 A test guarded by a feature macro fails the build, rather than vanishing, when the build expects the feature
+- **Date:** 2026-10-11. **Status:** Proposed. **Related:** T2, T5, T11, F-4, Q-02.
+- **Context:**
+  - The three fmt tests were wrapped in `#if defined(CJM_CT_STRING_VIEW_HAS_FMT)`, a macro that
+    nothing defines (F-4). The preprocessor dropped them without a word, and every run stayed
+    green.
+  - Any test behind a feature macro can vanish the same way: a typo in the test, a renamed macro
+    in the header, or a dependency the header cannot find.
+- **Decision:**
+  - The build states which features it expects, with a compile definition on the test target. For
+    fmt this is `CPS_CT_STRING_TESTS_EXPECT_FMT`, set in `CMakeLists.txt`, because the test target
+    always links fmt.
+  - Each feature-guarded block of tests gets an `#elif` on its own `#if`. When the build expects
+    the feature but the guard is false, an `#error` stops the build. Its message names the macro
+    and the likely causes.
+  - In T2 this covers `CPS_CT_STRING_VIEW_HAS_FMT` and `CPS_CT_STRING_VIEW_HAS_WFMT`
+    (`tests/cstr_view_tests.cpp`).
+  - A build that does not define the expectation keeps the old behaviour: the tests are left out.
+  - The expectation macro belongs to the tests only. It uses the `CPS_CT_STRING_` prefix, the
+    default of Q-02; if Q-02 is answered differently, T9 renames it with the other macros.
+  - Later checks of the same kind follow this pattern, for example T5's "fmt is off" check and
+    T11's forced on and off modes.
+- **Why:**
+  - A test that silently disappears reports a success it has not earned.
+  - Putting the `#error` on the same `#if` catches every cause, including the one behind F-4. A
+    separate check, such as "fmt expected but `CPS_CT_STRING_VIEW_HAS_FMT` undefined", would have
+    passed: the header did define that macro, while the tests checked `CJM_…`.
+  - It fails at compile time, on every toolchain, with no extra tooling. It works locally today
+    and in every CI job later.
+- **Verified (T2):** a build with the expectation fails with the message when fmt is hidden from
+  the header, when the stale `CJM_` name is put back, or when the header's macro is renamed. A
+  build without the expectation still compiles with fmt hidden.
+- **Alternatives:**
+  - Check after the build that `--gtest_list_tests` lists `CtSvFmtFormatter.*`. That needs a script
+    in every job that runs the tests, and it is easy to leave out of a new job.
+  - Always compile the tests and call `GTEST_SKIP()` when fmt is absent. A skipped test still
+    counts as passed, and the test body cannot compile without fmt anyway.
+  - Compare the number of tests with a fixed count. That breaks with every new test.
 
 ---
 
 ## CI and DevOps
 
 ### D-011 GitHub Actions on GitHub-hosted runners, with explicit image labels
-- **Date:** 2026-10-10. **Status:** Proposed. **Related:** T5–T8.
+- **Date:** 2026-10-10. **Status:** Accepted (T1, PR #14). **Related:** T5–T8.
 - **Decision:**
   - Use GitHub Actions on GitHub-hosted runners.
   - Name images explicitly (`ubuntu-24.04`, `windows-2022`, …), never `*-latest`.
@@ -228,15 +281,15 @@ reused, so they may appear out of numeric order.
 - **Alternatives:** Self-hosted runners or another CI service. Both add cost and administration.
 
 ### D-012 Workflow security baseline
-- **Date:** 2026-10-10. **Status:** Proposed. **Related:** T5 onwards, F-12, Q-16.
+- **Date:** 2026-10-10. **Status:** Accepted (T1, PR #14). **Related:** T5 onwards, F-12, Q-16.
 - **Decision:**
   - Workflows default to `permissions: contents: read`.
   - Third-party actions are pinned to full commit SHAs, with a version comment, and Dependabot keeps
     them current.
   - Dependabot's version updates for GitHub Actions come as one grouped weekly PR into
-    `develop-release_1`. Dependabot alerts are on, but its automatic security-update PRs are off:
-    they always target the default branch, which is `main` after the release (F-12). The weekly
-    version updates bring the same fixes.
+    `develop-release_1`. Dependabot alerts are on, but its automatic security-update PRs are off
+    (you apply both settings after T5, per Q-16): they always target the default branch, which is
+    `main` after the release (F-12). The weekly version updates bring the same fixes.
   - Checkouts do not persist credentials.
   - No `pull_request_target` workflows.
   - No secrets in pull-request jobs.
@@ -245,14 +298,15 @@ reused, so they may appear out of numeric order.
   re-pointed tag. Least privilege limits the damage if something does go wrong.
 
 ### D-013 PRs are tested as they will be merged, behind one required check
-- **Date:** 2026-10-10. **Status:** Proposed. **Related:** T5, Q-16, F-12.
+- **Date:** 2026-10-10. **Status:** Accepted (T1, PR #14). **Related:** T5, Q-16, F-12.
 - **Decision:**
   - CI runs on the `pull_request` event, which builds GitHub's merge commit of the PR into its base
     branch.
   - A final gate job, `ci-ok`, depends on every other job. It always runs, and it fails unless all
     of them succeeded.
-  - You add two rulesets (Q-16), each requiring `ci-ok` as the only status check. The one for
-    `develop-release_1` also requires the branch to be up to date before merging.
+  - You add two rulesets (Q-16, accepted 2026-10-11, applied after T5), each requiring `ci-ok` as
+    the only status check. The one for `develop-release_1` also requires the branch to be up to
+    date before merging.
 - **Why:**
   - This is exactly the brief's "run as they would be merged with the base branch".
   - The up-to-date rule closes the gap when the base branch moves after CI has run. `main` changes
@@ -264,7 +318,7 @@ reused, so they may appear out of numeric order.
 - **Alternative:** A merge queue. With one PR at a time it adds nothing over the up-to-date rule.
 
 ### D-014 Trigger scope grows in two phases
-- **Date:** 2026-10-10. **Status:** Proposed. **Related:** T5, T16, D-028.
+- **Date:** 2026-10-10. **Status:** Accepted (T1, PR #14). **Related:** T5, T16, D-028.
 - **Decision:**
   - **Phase 1 (T5).** Pushes to, and PRs into, `develop-release_1` and `main`, plus manual and
     weekly runs. Manual and weekly runs need the workflow on the default branch (D-028).
@@ -273,14 +327,16 @@ reused, so they may appear out of numeric order.
 - **Why:** This is the brief's ordering, and phase 2 is a tiny, separately reviewable change.
 
 ### D-028 Make `develop-release_1` the default branch until the release
-- **Date:** 2026-10-10. **Status:** Pending Q-21. **Related:** T5, T18, F-12, D-014.
+- **Date:** 2026-10-10. **Status:** Accepted: Q-21 answered with option (a) on 2026-10-11.
+- **Related:** T5, T18, F-12, D-014.
 - **Context:**
   - The weekly run, the manual "Run workflow" button, Dependabot and the PR template work only
     from files on the default branch, which is `main` (F-12).
   - All work lands on `develop-release_1`, so none of them would work before the release.
-- **Decision (default):**
+- **Decision:**
   - You make `develop-release_1` the default branch when T5 merges, and make `main` the default
-    again at the release (T18). It is a repository setting, not a code change.
+    again at the release (T18). It is a repository setting, not a code change, and Copilot cannot
+    change it.
   - Dependabot's version updates name `develop-release_1` as their target, so they keep landing
     there after the switch back.
   - T5's PR shows which of these features work, and how it was checked.
@@ -297,7 +353,7 @@ reused, so they may appear out of numeric order.
     template do nothing.
 
 ### D-015 Toolchains are obtained in a fixed order of preference
-- **Date:** 2026-10-10. **Status:** Proposed. **Related:** T6–T8.
+- **Date:** 2026-10-10. **Status:** Accepted (T1, PR #14). **Related:** T6–T8.
 - **Decision:**
   1. Compilers preinstalled on the runner.
   2. Otherwise, the Ubuntu archive. Example: `clang-19` and libc++ on `ubuntu-24.04`.
@@ -309,7 +365,7 @@ reused, so they may appear out of numeric order.
   documented.
 
 ### D-016 How CI obtains test dependencies (GoogleTest, fmt)
-- **Date:** 2026-10-10. **Status:** Proposed. **Related:** T5–T7, T12, T13.
+- **Date:** 2026-10-10. **Status:** Accepted (T1, PR #14). **Related:** T5–T7, T12, T13.
 - **Decision:**
   - **Linux jobs** use Ubuntu packages.
   - **Windows jobs** use the test suite's vcpkg manifest, with a pinned baseline, with installed
@@ -341,7 +397,7 @@ reused, so they may appear out of numeric order.
 - **Alternative:** Minimum 3.23, to install headers with `FILE_SET`. That drops stock Ubuntu 22.04.
 
 ### D-018 Tests, demo and their dependencies are optional
-- **Date:** 2026-10-10. **Status:** Proposed. **Related:** T4, T10.
+- **Date:** 2026-10-10. **Status:** Accepted (T1, PR #14). **Related:** T4, T10.
 - **Decision:**
   - New CMake options build the C++20 smoke check, the C++23 suite and the demo. They default to ON
     only when this is the top-level project, so your current workflow is unchanged.
@@ -352,8 +408,9 @@ reused, so they may appear out of numeric order.
   optional. Today every configure requires fmt and GoogleTest (F-6).
 
 ### D-019 Upstream ships an official CMake package
-- **Date:** 2026-10-10. **Status:** Pending Q-01 (names). **Related:** T9.
-- **Decision (default):**
+- **Date:** 2026-10-10. **Status:** Accepted: Q-01 answered with the recommended names on
+  2026-10-11. **Related:** T4, T9.
+- **Decision:**
   - Install headers plus `ct_stringConfig.cmake` and `ct_stringConfigVersion.cmake`, marked
     architecture-independent, with SameMajorVersion compatibility.
   - Export the namespaced target `ct_string::ct_string`, and keep `cstr_view` as an alias for
@@ -378,7 +435,7 @@ reused, so they may appear out of numeric order.
   - Keeping the default avoids breaking current users.
 
 ### D-021 Package managers: vcpkg and Conan 2 only
-- **Date:** 2026-10-10. **Status:** Proposed. **Related:** T12, T13, T19, T20.
+- **Date:** 2026-10-10. **Status:** Accepted (T1, PR #14). **Related:** T12, T13, T19, T20.
 - **Decision:**
   - Provide a vcpkg port and a Conan 2 recipe, maintained in this repository and later submitted
     upstream.
