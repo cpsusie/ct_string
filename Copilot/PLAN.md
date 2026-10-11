@@ -395,7 +395,10 @@ my standard library" is not the same as standard C++.
       compile-time checks assert it for every operand kind;
     - after Q-24, all of the above again: the smoke target on every toolchain listed, in C++20 and
       C++23 mode, and the suite and demo on GCC 14 (Debug and Release), Clang 20 (Debug) and
-      Clang 20 + libc++ 20. All 175 tests pass, and the demo exits with 0.
+      Clang 20 + libc++ 20. All 175 tests pass, and the demo exits with 0;
+    - each of the 40 container lookups, `const` or not, called with `nullptr` and with `0`,
+      reports a deleted function, never an ambiguity, with GCC 14, Clang 20 and Clang 20 +
+      libc++ 20. The compile-time checks cannot see this difference (D-032).
   - **Docs.** README and LEGENDUM, in parallel: "The two types at a glance" ("Duo genera
     breviter") now lists what the types compare with; "Language standard" ("Norma linguae")
     describes the smoke target's second translation unit; "Requirements" ("Quae requirantur")

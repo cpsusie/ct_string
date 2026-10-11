@@ -384,6 +384,9 @@ namespace
 
     /// Some member of the container \p C takes nullptr or a literal 0 as a key.
     /// A member that \p C does not have takes nothing.
+    /// This checks only that such a call does not compile. A requires-expression
+    /// cannot tell a deleted overload from an ambiguous call, so it does not check
+    /// that the deleted nullptr_t overloads are the ones chosen (D-032).
     template<typename C>
     concept some_lookup_takes_null =
         requires (C& c) { c.find(nullptr); } || requires (C& c) { c.find(0); }

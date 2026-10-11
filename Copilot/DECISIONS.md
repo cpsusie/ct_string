@@ -349,6 +349,13 @@ reused, so they may appear out of numeric order.
     of `std::hash`.
   - The same toolchains as D-030 pass, with `-Werror`. On GCC 14 and Clang 20 (libstdc++, and
     libc++ 20), all 175 tests pass, and the demo exits with 0.
+  - **What the tests cannot see.** A compile-time check sees only that a call does not compile. It
+    cannot tell a deleted overload from an ambiguous call. The review showed that the checks would
+    still pass with any one of 12 non-const twins removed. The diagnostic was therefore checked
+    directly: each of the 40 lookups, `const` or not, was called with `nullptr` and with `0` in
+    its own translation unit, with GCC 14, Clang 20 and Clang 20 + libc++ 20. All 80 calls report
+    a deleted function, and none an ambiguity. Removing one twin turns its diagnostic into
+    "ambiguous".
 - **Alternatives:**
   - Q-24 (b): reject `nullptr` in the comparators only, and document that the container lookups
     follow `std::basic_string_view`.
