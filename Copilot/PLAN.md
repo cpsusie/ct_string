@@ -364,9 +364,11 @@ my standard library" is not the same as standard C++.
   - **Tests, written first.** `tests/cxx20_comparison_checks.cpp`, in the smoke target, covers
     every operand kind in step 1, for both classes, both flavours of view and all five character
     types, in both orders, with `==`, `!=`, `<` and `<=>`. It checks `noexcept`, and that other
-    character types (including `signed char` and `unsigned char`) and `nullptr` do not compile. On
-    the old headers it failed with libc++ (20 errors) and, with libstdc++ in C++20 mode, at the
-    `nullptr` and Q-23 assertions. The suite gained 15 typed tests,
+    character types (including `signed char` and `unsigned char`), `nullptr`, and operands whose
+    conversion from a `const` lvalue may throw do not compile. On the old headers it failed with
+    libc++ at every literal, array and pointer check, and with every library at the Q-23 and
+    throwing-conversion assertions (74 errors in all with libc++). With libstdc++ in C++20 mode it
+    also failed at the `nullptr` assertions. The suite gained 15 typed tests,
     `RuntimeOperandComparison/*`, for operands that exist only at run time: 160 tests became 175.
   - **Verified**, all with `-Werror`:
     - smoke target: GCC 11.1 (official container), 12, 13 and 14; Clang 17, 18 and 20 with

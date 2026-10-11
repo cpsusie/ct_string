@@ -244,11 +244,17 @@ reused, so they may appear out of numeric order.
   - It rejects `std::nullptr_t`, on every standard library and language version.
   - The operators stay unconditionally `noexcept`. Their meaning is unchanged: the other operand is
     converted to a string view, so an array or a pointer is read up to its first null character.
-  - The constraint checks the conversion of `const T&`, which is what the operators' bodies
-    convert, rather than of the deduced type `T`. For every documented operand the answer is the
-    same. Only a type that converts from an rvalue but not from a `const` lvalue behaves
-    differently: before, the operator was chosen and then failed to compile; now it is not a
-    candidate.
+  - The constraint checks the conversion of `const T&`, which is exactly what the operators'
+    bodies convert, rather than of an rvalue of the deduced type `T`. For every documented operand
+    the answer is the same. It differs only for types whose conversions are ref-qualified
+    differently:
+    - a `const&` conversion that may throw, with a `noexcept` rvalue one: no longer accepted.
+      Before, it was accepted, and a throw inside the `noexcept` operator would have called
+      `std::terminate`;
+    - a conversion from rvalues only: no longer a candidate. Before, the operator was chosen and
+      then failed to compile;
+    - a `noexcept` `const&` conversion, with the rvalue one deleted: now accepted. Before, it was
+      rejected.
 - **Why:**
   - The accepted operands, and `noexcept`, are the same on every standard library (D-024).
   - `noexcept` is accurate. The conversion of an array or a pointer cannot throw; its only
@@ -257,8 +263,12 @@ reused, so they may appear out of numeric order.
   - Comparing with `nullptr` is never valid, so a compile error replaces undefined behaviour.
   - Sharing one constraint keeps the two class templates from drifting apart.
 - **Verified (T3):**
-  - Tests were written first. On the old headers, the new compile-time checks fail with libc++
-    (20 errors) and, with libstdc++ in C++20 mode, at the `nullptr` and Q-23 assertions.
+  - Tests were written first. On the old headers, the new compile-time checks fail with libc++ at
+    every literal, array and pointer check and at the Q-23 assertion (71 errors, with Clang's error
+    limit off). With libstdc++ in C++20 mode they fail at the `nullptr` and Q-23 assertions.
+  - A further check, added after review, covers an operand whose conversion from a `const` lvalue
+    may throw (the first of the cases above). On the old headers it fails with every library
+    (3 more errors, 74 in all with libc++); on the new ones it passes.
   - The C++20 smoke target, with the new checks, builds with `-Werror` on GCC 11.1 (official
     container), 12, 13 and 14; Clang 17, 18 and 20 with libstdc++; Clang 17 + libc++ 17; and
     Clang 20 + libc++ 20. The checks also pass in C++23 mode.

@@ -12,8 +12,8 @@
 //     constant (std::basic_string cannot be one on GCC 11, so the test suite
 //     checks its answers at run time);
 //   * every such comparison is noexcept, whatever the standard library;
-//   * comparing with another character type, or with nullptr, does not
-//     compile.
+//   * comparing with another character type, with nullptr, or with an operand
+//     whose conversion may throw, does not compile.
 //
 // Like cxx20_header_smoke.cpp, this TU is part of the C++20-pinned smoke
 // target, so it needs no test framework and runs wherever that target builds.
@@ -255,6 +255,28 @@ namespace
     static_assert(!not_exact_same_nothrow_convertible_to<std::string_view, std::string_view>);
     static_assert(not_same_unqual_type_nothrow_convertible_to<nothrow_to_sv, std::string_view>);
     static_assert(!not_same_unqual_type_nothrow_convertible_to<throwing_to_sv, std::string_view>);
+
+    // -- operands whose conversion may throw -----------------------------------
+    // The operators are noexcept, and they convert a const lvalue of the other
+    // operand. An operand whose conversion from a const lvalue may throw must
+    // therefore not compare, even when its conversion from an rvalue cannot
+    // throw (D-030). Before T3 such an operand compared, and a throw would have
+    // called std::terminate.
+
+    struct throws_only_from_const_lvalue
+    {
+        operator std::string_view() const& { return {}; } // NOLINT(*-explicit-constructor)
+        operator std::string_view() && noexcept { return {}; } // NOLINT(*-explicit-constructor)
+    };
+
+    template<typename TSubject>
+    concept rejects_throwing_conversions =
+        !comparable_at_all<const TSubject&, const throwing_to_sv&>
+        && !comparable_at_all<const TSubject&, const throws_only_from_const_lvalue&>;
+
+    static_assert(rejects_throwing_conversions<basic_ct_string_view<char, true>>);
+    static_assert(rejects_throwing_conversions<basic_ct_string_view<char, false>>);
+    static_assert(rejects_throwing_conversions<basic_fixed_string<char, 4>>);
 }
 
 #undef CPS_CMP_LIT
