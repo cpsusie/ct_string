@@ -1,6 +1,6 @@
 # Development and release plan: `ct_string`
 
-> **Status:** Task 1 deliverable, for your review. **Last updated:** 2026-10-10.
+> **Status:** T1 merged (PR #14). T2 in review; T3 planned in full. **Last updated:** 2026-10-11.
 > **Approver:** @cpsusie. **Author:** Copilot.
 > **Brief:** [develop-release-project.md](develop-release-project.md).
 > **Companion documents:**
@@ -115,13 +115,13 @@ Every requirement in the brief maps to the tasks and decisions that satisfy it.
 | R-16 | CI tracks `develop-release_1` and `main`, later every `develop`/`release` branch | T5, T16 · D-014, D-028 · Q-21 |
 | R-17 | PRs are tested as merged with their base | T5 · D-013 (one gate check) |
 | R-18 | One small PR at a time; approval before the next; tests and docs with every change | §3 · D-003 |
-| R-19 | A plan with timeline, milestones, tasks, definitions of done, and a decision log in `Copilot/` | This PR (T1) · D-001 |
+| R-19 | A plan with timeline, milestones, tasks, definitions of done, and a decision log in `Copilot/` | T1 (PR #14) · D-001 |
 | R-20 | Plan the following tasks at the end of each task or milestone | §3.4 · D-002 |
 | R-21 | "If you require additional information, now is the time to ask" | [QUESTIONS.md](QUESTIONS.md) |
 
 ## 5. What the repository looks like at 1.0
 
-Names assume the defaults in Q-01, Q-02 and Q-15.
+Names follow Q-01 (answered) and assume the defaults in Q-02 and Q-15.
 
 ### 5.1 Repository layout
 
@@ -191,7 +191,7 @@ Sizes: **S** is under about 150 changed lines, **M** is about 150–400. Anythin
 
 | Task | Title | Milestone | Size | Depends on | You |
 |---|---|---|---|---|---|
-| T1 | Development and release plan (this PR) | M0 | S | — | review |
+| T1 | Development and release plan (PR #14) | M0 | S | — | review |
 | T2 | Restore the silently disabled fmt tests | M1 | S | T1 | review |
 | T3 | Make comparisons portable to libc++ | M1 | M | T2 | review |
 | T4 | CMake hygiene: version range, optional tests and dependencies, presets | M2 | M | T3 | review |
@@ -215,22 +215,25 @@ Sizes: **S** is under about 150 changed lines, **M** is about 150–400. Anythin
 
 ### M0: Plan
 
-#### T1: Development and release plan
+#### T1: Development and release plan (done: PR #14, merged 2026-10-10)
 - **Deliverables:** `Copilot/PLAN.md`, `Copilot/DECISIONS.md`, `Copilot/QUESTIONS.md` and
   `Copilot/FINDINGS.md`. No code changes; README and LEGENDUM are untouched (D-004).
 - **Done when:** you have reviewed and merged it. Answering the questions now is welcome but not
   required: each is needed only by its "Needed by" task, and answers given during this review are
   recorded in the T2 PR.
+- **Outcome.** During the review you answered Q-01, Q-06, Q-16 and Q-21, accepting the defaults.
+  T2 records the answers.
 
 ### M1: Correctness fixes found while planning (week 1)
 
 *What you will learn:* how a green test run can hide tests that never compiled, and why "works on
 my standard library" is not the same as standard C++.
 
-#### T2: Restore the silently disabled fmt tests (NEXT TASK, planned in full)
+#### T2: Restore the silently disabled fmt tests (in review)
 - **Why.** Three `CtSvFmtFormatter` tests never compile, because they check a stale macro name
   (FINDINGS F-4). The fmt integration is effectively untested.
-- **Branch:** `copilot/t2-fix-fmt-test-macro`, from `develop-release_1`.
+- **Branch:** `copilot/t2-fix-fmt-test-macro`, from `develop-release_1`. The tooling named the
+  actual branch `copilot/make-develop-release-1-default-branch`.
 - **Steps.**
   1. In `tests/cstr_view_tests.cpp` (lines 1181 and 1203), replace `CJM_CT_STRING_VIEW_HAS_FMT`
      with `CPS_CT_STRING_VIEW_HAS_FMT`.
@@ -257,31 +260,94 @@ my standard library" is not the same as standard C++.
   - README and LEGENDUM are corrected in parallel.
   - The library headers are unchanged.
 - **Out of scope:** changing how fmt is detected (T11).
+- **Outcome.**
+  - The three tests are restored, and a fourth covers `wchar_t`. The guard is decision D-029:
+    `CMakeLists.txt` defines `CPS_CT_STRING_TESTS_EXPECT_FMT` for the test target, and each
+    guarded block has an `#elif` that stops the build with `#error`.
+  - With fmt 9.1, on GCC 14 and on Clang 20 (libstdc++), in Debug and Release with `-Werror`,
+    all **160** tests pass. The four `CtSvFmtFormatter.*` tests are listed and run, and the demo
+    exits with 0.
+  - The guard was checked by breaking the build on purpose. Hiding fmt from the header, putting
+    back the stale `CJM_` name, and renaming the header's macro each stop the build with the
+    message. Without the expectation, a build with fmt hidden still compiles.
+  - README and LEGENDUM are corrected in two places each. The plan named only Use case 5, but the
+    "Optional: {fmt} support" section (LEGENDUM: "`{fmt}` si desideratur") had the same wrong
+    claim about include order.
+  - The library headers are unchanged.
 
-#### T3: Make comparisons portable to libc++
+#### T3: Make comparisons portable to libc++ (NEXT TASK, planned in full)
 - **Goal.** Comparisons between `basic_ct_string_view` or `basic_fixed_string` and string
   literals, arrays, pointers, `std::basic_string` and `std::basic_string_view` compile with
   **libc++ 17+**, as well as libstdc++ and the MSVC STL. Existing meaning and `noexcept` stay as
-  they are (FINDINGS F-5, D-024).
-- **Scope.** The 12 uses of the `nothrow_convertible_to` concept in `fixed_string.hpp` and
-  `ct_string_view.hpp`.
-- **Design choice, presented in the T3 PR and logged as a decision:**
-  - (a) **Recommended.** Keep the concept's intent and also accept same-character-type arrays and
-    pointers explicitly. Their conversion cannot throw; it only has a precondition (a terminating
-    null).
-  - (b) Accept anything convertible to the string view, with a conditional `noexcept`.
-- **Tests:**
-  - every operand kind, for every character type;
-  - compile-time checks of `noexcept`;
-  - local builds of the smoke target with Clang 17 + libc++ 17 and Clang 20 + libc++ 20;
-  - the full suite with libc++ 20 where possible. Problems that come only from test code are
-    recorded for T8.
-- **Docs.** The README and LEGENDUM requirements sections say that libc++ (17 or later) is
-  supported.
-- **Done when:**
-  - the smoke target compiles with libc++ 17–20;
-  - libstdc++ and MSVC STL behaviour is unchanged;
-  - tests and docs are updated.
+  they are (FINDINGS F-5, D-024). The one intended exception is comparing with `nullptr`, which is
+  never valid and is rejected everywhere if you accept Q-22's default.
+- **What planning found.**
+  - **The cause is four operator templates:** `operator==` and `operator<=>` in
+    `basic_ct_string_view` (`ct_string_view.hpp:555` and `:565`) and in `basic_fixed_string`
+    (`fixed_string.hpp:352` and `:363`). They accept an operand only if it is nothrow-convertible
+    to the string view, and with libc++ arrays and pointers are not (Q-22 explains why).
+  - **Correction to the outline.** The outline spoke of "12 uses" of the concept. That counted
+    every line that mentions it, definitions included; only the four templates need to change.
+    `ctsv_comparators.hpp` already handles libc++ on purpose: its lookup keys use plain
+    convertibility, with a conditional `noexcept` (lines 85–103).
+  - **What fails today.** The smoke check fails at `tests/cxx20_header_smoke.cpp:50–51`, with
+    libc++ 17 and with libc++ 20. In the suite, with libc++ 20, only `cstr_view_tests.cpp` fails:
+    10 errors, all comparisons with a literal or an array. The other two test files already
+    compile.
+  - **`nullptr`.** `view == nullptr` compiles with libstdc++ in C++20 mode (GCC 14, Clang 20), and
+    then has undefined behaviour at run time. C++23 and libc++ reject it (Q-22).
+  - **Unused concepts.** Four public concepts next to `nothrow_convertible_to` are unused, and one
+    is misnamed (Q-23).
+- **Prototype.** A throwaway prototype of Q-22 option (a), not committed, showed the approach is
+  enough:
+  - the smoke check compiles with libc++ 17 and 20;
+  - with Clang 20 + libc++ 20, the whole suite builds and passes (160 tests). GoogleTest was
+    built against libc++ from Ubuntu's sources in `/usr/src/googletest`;
+  - the demo builds and runs with libc++ 20 when fmt is used header-only. The demo links Ubuntu's
+    compiled fmt library, which is built for libstdc++ and cannot be linked with libc++.
+- **Branch:** `copilot/t3-libcxx-comparisons`, from `develop-release_1`.
+- **Questions:** Q-22 (the design) and Q-23 (the misnamed concept). Both have defaults, so T3 can
+  start without your answers; its PR then asks again.
+- **Steps.**
+  1. Write the tests first, and see them fail with libc++:
+     - A new C++20 source in the smoke target, made only of compile-time checks, so it runs
+       wherever the smoke target builds, including toolchains without GoogleTest.
+     - Operands: a string literal, a `const` and a non-`const` array, a `const` and a non-`const`
+       pointer, `std::basic_string_view`, `std::basic_string` and `basic_fixed_string`.
+     - Each is compared with both class templates (and both flavours of view), for all five
+       character types, in both operand orders, with `==`, `!=`, `<` and `<=>`.
+     - Each comparison is also checked to be `noexcept`.
+     - What must not compile is checked too: operands of another character type, and `nullptr`.
+     - Run-time tests in the suite cover operands that exist only at run time, such as a
+       `std::string` or a `char` buffer filled at run time. GCC 11's `std::string` is not
+       `constexpr`, so those cannot be compile-time checks.
+  2. Change the four templates as Q-22 decides. Both classes use one shared constraint, so they
+     cannot drift apart; it is not added to the public API. Update the operators' doc comments.
+  3. Apply Q-23.
+  4. Verify, as listed under "Definition of done".
+  5. Docs, in README and LEGENDUM together:
+     - "Requirements" ("Quae requirantur"): libc++ 17 or later works. Until T8 adds it to CI, it
+       is described as verified locally.
+     - The quick-start comparison example (README around line 173, LEGENDUM around line 137):
+       list what a view compares with.
+  6. Log the outcomes of Q-22 and Q-23 as decisions. Update this plan: status, and T4 in full.
+- **Definition of done.**
+  - The smoke target, with the new checks, compiles with `-Werror` on:
+    - Clang 17 + libc++ 17 and Clang 20 + libc++ 20;
+    - GCC 14, Clang 17 and Clang 20 with libstdc++;
+    - GCC 11.1, the floor, in the official `gcc:11.1` container, as in FINDINGS F-2.
+  - On GCC 14 and Clang 20 with libstdc++, the full suite (the 160 existing tests plus the new
+    ones) and the demo pass, in Debug and Release.
+  - With Clang 20 + libc++ 20, the full suite passes, using GoogleTest built against libc++. Any
+    problem that comes only from test code is listed for T8 instead.
+  - `noexcept` is unchanged for every comparison that compiled before, `nullptr` aside.
+  - README and LEGENDUM are updated in parallel.
+- **Out of scope.**
+  - libc++ and macOS in CI (T8).
+  - Building the demo with libc++. It needs fmt built for libc++, or used header-only; T8
+    decides.
+  - MSVC, which cannot be tested locally. Its STL already accepts these comparisons, and T7 checks
+    the result in CI.
 - **M1 checkpoint:** re-plan (§3.4).
 
 ### M2: Build foundation and CI (weeks 2–4)
@@ -336,8 +402,8 @@ runners and containers; required status checks and rulesets; Dependabot; least-p
   - A CI badge in README and LEGENDUM.
 - **You:**
   - create the two branch rulesets, both requiring `ci-ok`, and apply the Dependabot settings
-    (Q-16);
-  - if Q-21 is (a), make `develop-release_1` the default branch.
+    (Q-16, accepted);
+  - make `develop-release_1` the default branch (Q-21, accepted: D-028).
 
   The PR includes click-by-click steps for both.
 - **Done when:**
@@ -389,6 +455,8 @@ runners and containers; required status checks and rulesets; Dependabot; least-p
 #### T8: libc++, sanitizers and macOS
 - **Scope.**
   - libc++ jobs: Clang 17 with libc++ 17 (floor), and Clang 20 with libc++ 20.
+    - Ubuntu's GoogleTest and fmt libraries are built for libstdc++. These jobs build GoogleTest
+      against libc++, and use fmt header-only or build it too (found while planning T3).
   - The suite under AddressSanitizer and UndefinedBehaviorSanitizer, with GCC 14 and Clang 20.
   - macOS `macos-15` with AppleClang, if Q-07 is yes.
   - README and LEGENDUM rows for libc++ and macOS.
@@ -528,7 +596,7 @@ recipes, profiles, `test_package`, and the `CMakeDeps`/`CMakeToolchain` generato
   3. **You:** open the promotion PR from `develop-release_1` into `main`. Merge it with a merge
      commit once `ci-ok` is green (D-003).
   4. **You:** push the annotated tag `v1.0.0` on `main`. The workflow publishes the release.
-  5. **You:** if Q-21 is (a), make `main` the default branch again.
+  5. **You:** make `main` the default branch again (Q-21, D-028).
 - **Done when:** the GitHub Release `v1.0.0` exists, with notes and checksums, and `main` contains
   exactly what was reviewed on `develop-release_1`. The consumption routes are checked against the
   published release in T19 and T20.
@@ -574,10 +642,10 @@ The upstream PRs live in other repositories, so the "one PR at a time" rule does
 
 ## 7. Timeline
 
-The timeline is **relative and review-gated**: week 1 starts when this PR is merged. It assumes
-about two PRs per week, reviews within one to three days, and no major surprises from the older
-MSVC toolsets, libc++ or macOS. A late review moves everything after it; the **order** matters
-more than the dates.
+The timeline is **relative and review-gated**: week 1 started when T1 was merged (2026-10-10). It
+assumes about two PRs per week, reviews within one to three days, and no major surprises from the
+older MSVC toolsets, libc++ or macOS. A late review moves everything after it; the **order**
+matters more than the dates.
 
 | Week | Tasks | Checkpoint |
 |---|---|---|
@@ -598,7 +666,7 @@ Risk IDs use K-n, to avoid clashing with the requirement IDs (R-n) in §4.
 | # | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|---|
 | K-1 | An older MSVC toolset or a clang-cl rejects valid C++20 | Medium | Medium | Probe each one in T7. You decide between a workaround and dropping it (Q-06). |
-| K-2 | The test code has more libc++ differences | Medium | Low–Medium | T3 is limited to the library; test-code issues go to T8. |
+| K-2 | The test code has more libc++ differences | Low: a T3 prototype passed the whole suite with libc++ 20 | Low–Medium | T3 is limited to the library; test-code issues go to T8. |
 | K-3 | Runner images change (compilers removed, `windows-2022` retired) | High over a year | Medium | Explicit labels, a weekly run (Q-21), toolchain versions logged; small PRs to adjust the matrix. |
 | K-4 | Docker Hub rate-limits `gcc:11.1` pulls | Low–Medium | Low | An access-token secret or a mirror (Q-17). |
 | K-5 | Registry reviewers ask for changes (naming, layout) | Medium | Medium | Follow their guides from the start (F-10). The in-repo port and recipe work in the meantime. |
@@ -608,7 +676,7 @@ Risk IDs use K-n, to avoid clashing with the requirement IDs (R-n) in §4.
 | K-9 | The quality of the Latin in LEGENDUM | Medium | Low | You review the Latin in each PR; Copilot keeps the existing register and vocabulary. |
 | K-10 | Scope creep (modules, more platforms) | Medium | Medium | Backlog (§11) and the decision log. |
 | K-11 | Installing older MSVC toolsets makes PR runs slow, or one is withdrawn from the installer | Medium | Low–Medium | T7 measures the cost, and Q-06 option (b) moves the full sweep to after merging. A toolset that cannot be installed fails its job visibly; a small PR then updates the matrix and the docs. |
-| K-12 | Features that read the default branch silently do nothing (weekly run, Dependabot, templates) | High without action | Medium | F-12 and Q-21. T5 checks each feature after merging. |
+| K-12 | Features that read the default branch silently do nothing (weekly run, Dependabot, templates) | Low, once you switch the default branch after T5 (Q-21) | Medium | F-12 and Q-21. T5 checks each feature after merging. |
 | K-13 | `main` changes outside promotions, so a promotion conflicts | Low | Medium | Rulesets allow changes to `main` only through PRs; Dependabot's security PRs, which would target `main`, are off (D-012); promotions use a merge commit (D-003). |
 
 ## 9. What only you can do
@@ -616,11 +684,11 @@ Risk IDs use K-n, to avoid clashing with the requirement IDs (R-n) in §4.
 1. Review and merge every PR.
 2. Answer [QUESTIONS.md](QUESTIONS.md), now or by each question's "Needed by" task.
 3. **After T5:** create the two branch rulesets, and set the merge options and the Dependabot
-   settings (Q-16). If Q-21 is (a), make `develop-release_1` the default branch.
+   settings (Q-16). Make `develop-release_1` the default branch (Q-21).
 4. **T6, only if needed:** add a Docker Hub access-token secret (Q-17).
 5. **After T15:** push the `v1.0.0-rc.1` tag on `develop-release_1` (the dry run).
 6. **T18:** promote `develop-release_1` into `main` (a PR you open, merged with a merge commit),
-   push the `v1.0.0` tag on `main`, and, if Q-21 is (a), make `main` the default branch again.
+   push the `v1.0.0` tag on `main`, and make `main` the default branch again (Q-21).
 7. **T19 and T20:** fork the registries, open the PRs, sign the ConanCenter CLA, and work with the
    reviewers.
 8. **After T21:** promote the updated documentation into `main`, without a tag.
@@ -629,9 +697,10 @@ Risk IDs use K-n, to avoid clashing with the requirement IDs (R-n) in §4.
 
 | Task | Status | PR | Notes |
 |---|---|---|---|
-| T1 | In review | this PR | Plan, decisions, questions, findings |
-| T2 | Next: planned in full | — | No blocking questions |
-| T3–T21 | Planned (outline) | — | Each is detailed in the PR of the task before it |
+| T1 | Merged | #14 | Plan, decisions, questions, findings. You answered Q-01, Q-06, Q-16 and Q-21 in review. |
+| T2 | In review | this PR | fmt tests restored, with a guard (D-029); the four answers recorded; Q-22 and Q-23 added for T3 |
+| T3 | Next: planned in full | — | Q-22 and Q-23 have defaults; neither blocks it |
+| T4–T21 | Planned (outline) | — | Each is detailed in the PR of the task before it |
 
 Milestone retrospectives will be added here.
 

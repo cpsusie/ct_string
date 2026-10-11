@@ -338,9 +338,11 @@ questions.
     own character type, by name.
     - The operators stay unconditionally `noexcept`, which is accurate: the conversion cannot
       throw.
-    - Operands and `noexcept` are then the same on every standard library.
+    - The accepted operands and `noexcept` are then the same on every standard library, once
+      `nullptr` is rejected too (below).
     - A throwaway prototype of this option compiled the C++20 smoke check with libc++ 17 and 20.
-      With libc++ 20, all 160 tests and the demo also passed. PLAN.md (T3) has the details.
+      With libc++ 20, all 160 tests passed, and so did the demo with fmt used header-only.
+      PLAN.md (T3) has the details.
   - (b) Accept anything convertible to the string view, with a `noexcept` that depends on the
     conversion. `ctsv_comparators.hpp` already does this for its lookup keys. It is simpler, but:
     - `noexcept(view == "x")` would be false with libc++ only;
@@ -352,13 +354,14 @@ questions.
 
 ### Q-23 A misnamed public concept, and three unused ones
 - **Context.** `fixed_string.hpp` (lines 52–63) defines four concepts in the public namespace
-  `cps::ct_string` that nothing in the library, the tests or the demo uses.
+  `cps::ct_string`. Nothing in the library, the tests or the demo uses them, except that one is
+  defined in terms of another.
   - One of them, `not_exact_same_nothrow_convertible_to`, does not check `noexcept`, despite its
     name. It is identical to `not_exact_same_convertible_to`.
   - After 1.0, Semantic Versioning makes changing or removing a public name a breaking change.
 - **Options:**
-  - (a) **Recommended.** In T3, which works on these concepts anyway, make the misnamed one check
-    `noexcept` as its name says, with a compile-time test. Keep the other three.
+  - (a) **Recommended.** In T3, which changes the code right next to them, make the misnamed one
+    check `noexcept` as its name says, with a compile-time test. Keep the other three.
   - (b) Remove all four before 1.0.
   - (c) Leave them as they are.
 - **Answer:** _pending_
