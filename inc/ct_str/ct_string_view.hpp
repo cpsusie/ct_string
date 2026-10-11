@@ -547,12 +547,18 @@ namespace cps::ct_string
             return m_str_v <=> other.m_str_v;
         }
 
-        // -- comparison: anything nothrow-convertible to std_sv_type (and not a basic_ct_string_view) --
-        /// \brief Equality with anything nothrow-convertible to std_sv_type
-        /// (e.g. a basic_fixed_string of the same character type, a
-        /// std::basic_string, a string literal). The other operand is first
-        /// converted to a std_sv_type, then compared.
-        template<nothrow_convertible_to<std_sv_type> TOther>
+        // -- comparison: literals, arrays, pointers, and anything else nothrow-convertible to std_sv_type --
+        /// \brief Equality with a string literal, an array or a pointer of
+        /// char_type (const or not), or anything else nothrow-convertible to
+        /// std_sv_type (e.g. a basic_fixed_string of the same character type,
+        /// a std::basic_string or a std::basic_string_view), but not a
+        /// basic_ct_string_view. The other operand is first converted to a
+        /// std_sv_type, then compared: an array or a pointer is read up to its
+        /// first null character.
+        /// \remarks Comparing with nullptr does not compile. As with
+        /// std::basic_string_view, behavior is undefined if a pointer is null,
+        /// or if an array or a pointer is not null-terminated.
+        template<detail::string_view_comparand<char_type> TOther>
             requires (!basic_ct_string_view_type<TOther>)
         [[nodiscard]] constexpr bool operator==(const TOther& other) const noexcept
         {
@@ -560,9 +566,10 @@ namespace cps::ct_string
             return m_str_v == other_sv;
         }
 
-        /// \brief Three-way comparison with anything nothrow-convertible to
-        /// std_sv_type (but not a basic_ct_string_view). See the equality version for conversion semantics.
-        template<nothrow_convertible_to<std_sv_type> TOther>
+        /// \brief Three-way comparison with the same operands as the equality
+        /// version accepts (but not a basic_ct_string_view). See the equality
+        /// version for conversion semantics.
+        template<detail::string_view_comparand<char_type> TOther>
             requires (!basic_ct_string_view_type<TOther>)
         [[nodiscard]] constexpr auto operator<=>(const TOther& other) const noexcept
         {

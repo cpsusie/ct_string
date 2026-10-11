@@ -13,6 +13,8 @@
 #include <string>
 #include <string_view>
 #include <functional>
+#include <algorithm>
+#include <compare>
 #if defined(__cpp_lib_format) && (__cpp_lib_format >= 201907L)
 #  include <format>
 #endif
@@ -599,6 +601,113 @@ TEST(CtStringView, CrossFlavorSpaceship)
     static constexpr ct_string_view non_cstr_sv = "banana"_ctsv;
     EXPECT_EQ(cstr_sv <=> non_cstr_sv, std::strong_ordering::less);
     EXPECT_EQ(non_cstr_sv <=> cstr_sv, std::strong_ordering::greater);
+}
+
+// --- Comparison: operands that exist only at run time ---
+// Both flavors of view, and the fixed string, in every character type, compare
+// with a std::basic_string, a std::basic_string_view of one, a buffer filled at
+// run time (longer than its text, so it is read up to its first null), and
+// pointers to both. tests/cxx20_comparison_checks.cpp checks, at compile time,
+// the operands that can be constants, noexcept, and what must not compile.
+
+namespace
+{
+    /// "abc" as a basic_fixed_string of each character type.
+    template<typename TChar> struct abc_text;
+    template<> struct abc_text<char>     { static constexpr auto value = "abc"_fs; };
+    template<> struct abc_text<wchar_t>  { static constexpr auto value = L"abc"_fs; };
+    template<> struct abc_text<char8_t>  { static constexpr auto value = u8"abc"_fs; };
+    template<> struct abc_text<char16_t> { static constexpr auto value = u"abc"_fs; };
+    template<> struct abc_text<char32_t> { static constexpr auto value = U"abc"_fs; };
+
+    /// Builds the string at run time, one character at a time.
+    template<typename TChar>
+    std::basic_string<TChar> runtime_string(const std::string_view ascii)
+    {
+        std::basic_string<TChar> result;
+        for (const char c : ascii)
+        {
+            result.push_back(static_cast<TChar>(c));
+        }
+        return result;
+    }
+
+    /// Expects \p subject to equal \p lo and to be less than \p hi, by every
+    /// operator, in both operand orders.
+    template<typename TSubject, typename TLo, typename THi>
+    void expect_compares(const TSubject& subject, TLo& lo, THi& hi)
+    {
+        EXPECT_TRUE(subject == lo);
+        EXPECT_TRUE(lo == subject);
+        EXPECT_FALSE(subject != lo);
+        EXPECT_FALSE(lo != subject);
+        EXPECT_TRUE(subject != hi);
+        EXPECT_TRUE(hi != subject);
+        EXPECT_TRUE(subject < hi);
+        EXPECT_TRUE(hi > subject);
+        EXPECT_FALSE(subject < lo);
+        EXPECT_FALSE(lo < subject);
+        EXPECT_EQ(subject <=> lo, std::strong_ordering::equal);
+        EXPECT_EQ(lo <=> subject, std::strong_ordering::equal);
+        EXPECT_EQ(subject <=> hi, std::strong_ordering::less);
+        EXPECT_EQ(hi <=> subject, std::strong_ordering::greater);
+    }
+
+    /// \p subject must have the text "abc".
+    template<typename TSubject>
+    void expect_compares_with_runtime_operands(const TSubject& subject)
+    {
+        using char_type = typename TSubject::char_type;
+
+        const std::basic_string<char_type> lo_str = runtime_string<char_type>("abc");
+        std::basic_string<char_type> hi_str = runtime_string<char_type>("abd");
+        expect_compares(subject, lo_str, hi_str);
+
+        const std::basic_string_view<char_type> lo_sv = lo_str;
+        const std::basic_string_view<char_type> hi_sv = hi_str;
+        expect_compares(subject, lo_sv, hi_sv);
+
+        char_type lo_buf[16]{};
+        char_type hi_buf[16]{};
+        std::ranges::copy(lo_str, lo_buf);
+        std::ranges::copy(hi_str, hi_buf);
+        expect_compares(subject, lo_buf, hi_buf);
+
+        const auto& lo_const_buf = lo_buf;
+        const auto& hi_const_buf = hi_buf;
+        expect_compares(subject, lo_const_buf, hi_const_buf);
+
+        const char_type* lo_const_ptr = lo_str.c_str();
+        const char_type* hi_const_ptr = hi_str.c_str();
+        expect_compares(subject, lo_const_ptr, hi_const_ptr);
+
+        char_type* lo_ptr = lo_buf;
+        char_type* hi_ptr = hi_buf;
+        expect_compares(subject, lo_ptr, hi_ptr);
+    }
+}
+
+template<typename TChar>
+class RuntimeOperandComparison : public ::testing::Test {};
+
+using all_std_char_types = ::testing::Types<char, wchar_t, char8_t, char16_t, char32_t>;
+TYPED_TEST_SUITE(RuntimeOperandComparison, all_std_char_types);
+
+TYPED_TEST(RuntimeOperandComparison, KnownCstrView)
+{
+    static constexpr basic_ct_string_view<TypeParam, true> subject = make_ctsv<abc_text<TypeParam>::value>();
+    expect_compares_with_runtime_operands(subject);
+}
+
+TYPED_TEST(RuntimeOperandComparison, NonCstrView)
+{
+    static constexpr basic_ct_string_view<TypeParam, false> subject = make_ctsv<abc_text<TypeParam>::value>();
+    expect_compares_with_runtime_operands(subject);
+}
+
+TYPED_TEST(RuntimeOperandComparison, FixedString)
+{
+    expect_compares_with_runtime_operands(abc_text<TypeParam>::value);
 }
 
 // --- Converting construction/assignment (true -> false) ---
