@@ -592,10 +592,12 @@ auto d = std::format("{:.3}",    "hello"_ctsv);  // "hel"
 auto w = std::format(L"{}",      cps::ct_string::make_ctsv<L"wide">()); // L"wide"
 ```
 
-If you also include `<fmt/format.h>` *before* `<ct_str/ct_string_view.hpp>`,
-`fmt::format(...)` works with the same syntax. The fmt support is
-auto-detected via `__has_include` and gated on the
-`CJM_CT_STRING_VIEW_HAS_FMT` macro defined by the header.
+If `<fmt/format.h>` is on your include path, `fmt::format(...)` works with the
+same syntax. You do not need to include fmt yourself, and include order does
+not matter: `<ct_str/ct_string_view.hpp>` detects fmt with `__has_include`
+and includes it on its own. When it does, it defines
+`CPS_CT_STRING_VIEW_HAS_FMT`; when it also finds `<fmt/xchar.h>`, needed for
+`wchar_t`, it includes that too and defines `CPS_CT_STRING_VIEW_HAS_WFMT`.
 
 ---
 
@@ -997,10 +999,10 @@ Add `inc/` to your include path and `#include <ct_str/ct_string_view.hpp>`
 
 ### Optional: `{fmt}` support
 
-If `<fmt/format.h>` is reachable from your include path *and* it is
-included before `<ct_str/ct_string_view.hpp>` (or the header detects it via
-`__has_include`), a `fmt::formatter` specialization for
-`basic_ct_string_view` is enabled automatically. No extra macro is
+If `<fmt/format.h>` is reachable from your include path,
+`<ct_str/ct_string_view.hpp>` detects it via `__has_include`, includes it,
+and enables a `fmt::formatter` specialization for `basic_ct_string_view`
+automatically. Include order does not matter, and no extra macro is
 required from the user.
 
 ### Running the tests
