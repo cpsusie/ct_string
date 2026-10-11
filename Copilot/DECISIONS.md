@@ -81,6 +81,10 @@ reused, so they may appear out of numeric order.
   - **Update (2026-10-11):** you accepted Q-16, so from T5 on the rulesets enforce this: squash
     only into `develop-release_1`, merge commits only into `main`. Until then, task PRs can be
     merged either way.
+- **Update (2026-10-11, during T3):** Copilot opens each task's PR itself, as soon as it can meet
+  the task's definition of done without further input from you. You still review and merge by
+  hand. In your words: "Please open PRs when you can satisfy phase requirements without further
+  input from me. I will review and merge manually."
 
 ### D-004 The Task 1 PR changes documentation only, and README/LEGENDUM stay unchanged
 - **Date:** 2026-10-10. **Status:** Accepted (T1, PR #14). **Related:** T1, D-025.

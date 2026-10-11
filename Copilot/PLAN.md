@@ -53,8 +53,9 @@ Details and reproduction steps are in [FINDINGS.md](FINDINGS.md).
    From T5 onward, CI runs on the PR's merge commit.
 4. **Plan ahead.** The same PR updates this plan (status, plus the **next** task in full detail)
    and the decision log.
-5. **Review.** You review the code, the docs (including the Latin) and the plan for the next task.
-   Then you approve and merge.
+5. **Review.** Copilot opens the PR itself as soon as it can meet the task's definition of done
+   (§3.2) without further input from you (D-003). You review the code, the docs (including the
+   Latin) and the plan for the next task. Then you approve and merge.
 6. **Next task.** Only then does the next task start. No two task PRs are open at once; your
    promotion PRs and Dependabot's PRs are outside this rule (D-003).
 
