@@ -1,7 +1,7 @@
 # Development and release plan: `ct_string`
 
-> **Status:** T1 merged (PR #14), so M0 is done (retrospective in §10). T2 in review; T3 planned in
-> full. **Last updated:** 2026-10-11.
+> **Status:** T1 (PR #14) and T2 (PR #15) merged. M0 is done (retrospective in §10). T3 in review;
+> it closes M1 (retrospective in §10). T4 planned in full. **Last updated:** 2026-10-11.
 > **Approver:** @cpsusie. **Author:** Copilot.
 > **Brief:** [develop-release-project.md](develop-release-project.md).
 > **Companion documents:**
@@ -106,7 +106,7 @@ Every requirement in the brief maps to the tasks and decisions that satisfy it.
 | R-6 | Find the **earliest** working GCC and Clang on Linux and use them in CI | F-2 · T6 · D-006, D-007 |
 | R-7 | CI enforces every MSVC with (nearly) full C++20 | T7 · D-009 · Q-06 |
 | R-8 | The same for Visual Studio's clang-cl | T7 · D-010 |
-| R-9 | Cross-platform, standard C++ only | T3, T8 · D-024 |
+| R-9 | Cross-platform, standard C++ only | T3, T8 · D-024, D-030 |
 | R-10 | Full C++23 suite in CI on GCC, Clang and VS | T5–T8 · D-008 |
 | R-11 | Building the test suite is optional for users | T4, T10 · D-018 |
 | R-12 | **Separate** vcpkg and Conan configurations for the library and for the test suite | T10, T12, T13 · D-022 · Q-08 |
@@ -160,7 +160,7 @@ Explicit runner labels throughout (D-011).
 |---|---|---|---|
 | Linux, C++20 floor and range | `ubuntu-22.04`, `ubuntu-24.04`, `ubuntu-26.04`, and the `gcc:11.1` container | GCC 11.1, 11.4, 12, 13, 14, 15; Clang 17, 18, 19, 20, 21, 22 (libstdc++) | C++20 smoke with fmt, and without fmt installed; install-and-consume |
 | Linux, C++23 suite | `ubuntu-24.04`, `ubuntu-26.04` | GCC 14, 15; Clang 19, 20, 21, 22 | Full suite and demo, Debug and Release |
-| Linux, libc++ | `ubuntu-24.04` | Clang 17 with libc++ 17; Clang 20 with libc++ 20 | Smoke; suite if feasible |
+| Linux, libc++ | `ubuntu-24.04` | Clang 17 with libc++ 17; Clang 20 with libc++ 20 | Smoke on both; suite with libc++ 20 (T3 showed it passes) |
 | Sanitizers | `ubuntu-24.04` | GCC 14, Clang 20 | Suite under AddressSanitizer and UndefinedBehaviorSanitizer |
 | Linux arm64 (Q-18) | `ubuntu-24.04-arm` | GCC 14 | Full suite (where `char` is unsigned) |
 | CMake versions | `ubuntu-24.04` | CMake 3.21 and newest 4.x | Configure, build, install, consume |
@@ -230,7 +230,7 @@ Sizes: **S** is under about 150 changed lines, **M** is about 150–400. Anythin
 *What you will learn:* how a green test run can hide tests that never compiled, and why "works on
 my standard library" is not the same as standard C++.
 
-#### T2: Restore the silently disabled fmt tests (in review)
+#### T2: Restore the silently disabled fmt tests (done: PR #15, merged 2026-10-11)
 - **Why.** Three `CtSvFmtFormatter` tests never compile, because they check a stale macro name
   (FINDINGS F-4). The fmt integration is effectively untested.
 - **Branch:** `copilot/t2-fix-fmt-test-macro`, from `develop-release_1`. The tooling named the
@@ -275,8 +275,9 @@ my standard library" is not the same as standard C++.
     "Optional: {fmt} support" section (LEGENDUM: "`{fmt}` si desideratur") had the same wrong
     claim about include order.
   - The library headers are unchanged.
+  - After merging it, you refined the Latin of the two fmt passages yourself (PR #16).
 
-#### T3: Make comparisons portable to libc++ (NEXT TASK, planned in full)
+#### T3: Make comparisons portable to libc++ (in review)
 - **Goal.** Comparisons between `basic_ct_string_view` or `basic_fixed_string` and string
   literals, arrays, pointers, `std::basic_string` and `std::basic_string_view` compile with
   **libc++ 17+**, as well as libstdc++ and the MSVC STL. Existing meaning and `noexcept` stay as
@@ -306,9 +307,10 @@ my standard library" is not the same as standard C++.
     built against libc++ from Ubuntu's sources in `/usr/src/googletest`;
   - the demo builds and runs with libc++ 20 when fmt is used header-only. The demo links Ubuntu's
     compiled fmt library, which is built for libstdc++ and cannot be linked with libc++.
-- **Branch:** `copilot/t3-libcxx-comparisons`, from `develop-release_1`.
+- **Branch:** `copilot/t3-libcxx-comparisons`, from `develop-release_1`. The tooling named the
+  actual branch `copilot/execute-next-phase-plan`.
 - **Questions:** Q-22 (the design) and Q-23 (the misnamed concept). Both have defaults, so T3 can
-  start without your answers; its PR then asks again.
+  start without your answers; its PR then asks again. You answered both when T3 started (QUESTIONS).
 - **Steps.**
   1. Write the tests first, and see them fail with libc++:
      - A new C++20 source in the smoke target, made only of compile-time checks, so it runs
@@ -349,40 +351,126 @@ my standard library" is not the same as standard C++.
     decides.
   - MSVC, which cannot be tested locally. Its STL already accepts these comparisons, and T7 checks
     the result in CI.
-- **M1 checkpoint:** re-plan (§3.4).
+- **Outcome.**
+  - **Answers.** Q-22: the default, recorded as D-030. Q-23: option (a), as Copilot reads your note,
+    recorded as D-031; please confirm.
+  - **Library.** One non-public constraint, `detail::string_view_comparand` in `fixed_string.hpp`,
+    is used by all four templates. It names arrays and pointers of the class's own character type,
+    keeps "anything else nothrow-convertible", and rejects `nullptr`. The operators stay
+    unconditionally `noexcept`, and their doc comments now list the operands. The misnamed concept
+    checks `noexcept` (Q-23). Only `fixed_string.hpp` and `ct_string_view.hpp` changed, by about
+    75 lines, most of them doc comments; `ctsv_comparators.hpp` and `ctsv_containers.hpp` are
+    unchanged.
+  - **Tests, written first.** `tests/cxx20_comparison_checks.cpp`, in the smoke target, covers
+    every operand kind in step 1, for both classes, both flavours of view and all five character
+    types, in both orders, with `==`, `!=`, `<` and `<=>`. It checks `noexcept`, and that other
+    character types (including `signed char` and `unsigned char`) and `nullptr` do not compile. On
+    the old headers it failed with libc++ (20 errors) and, with libstdc++ in C++20 mode, at the
+    `nullptr` and Q-23 assertions. The suite gained 15 typed tests,
+    `RuntimeOperandComparison/*`, for operands that exist only at run time: 160 tests became 175.
+  - **Verified**, all with `-Werror`:
+    - smoke target: GCC 11.1 (official container), 12, 13 and 14; Clang 17, 18 and 20 with
+      libstdc++; Clang 17 + libc++ 17; Clang 20 + libc++ 20. The new checks also pass in C++23
+      mode;
+    - suite and demo: GCC 14 and Clang 20 with libstdc++, Debug and Release: 175 tests pass, and
+      the demo exits with 0;
+    - Clang 20 + libc++ 20: all 175 tests pass, with GoogleTest built against libc++ from
+      `/usr/src/googletest`; the demo builds and runs with fmt used header-only. No test-code
+      problem was found for T8;
+    - `noexcept` is unchanged for every comparison that compiled before, `nullptr` aside: the
+      compile-time checks assert it for every operand kind.
+  - **Docs.** README and LEGENDUM, in parallel: "The two types at a glance" ("Duo genera
+    breviter") now lists what the types compare with; "Language standard" ("Norma linguae")
+    describes the smoke target's second translation unit; "Requirements" ("Quae requirantur")
+    says libc++ 17 or later works, verified locally, and that libc++ 17 and 18 leave out
+    `std::formatter`.
+  - **Found on the way (F-14).**
+    - Ubuntu's libc++ 17 and libc++ 20 packages replace each other, so a local "libc++ 20" result
+      can silently come from libc++ 17. T3's results were checked against `_LIBCPP_VERSION`.
+    - libc++ 17 and 18 do not define `__cpp_lib_format`, so the library's `std::formatter` and
+      its seven tests silently drop out there (Q-25).
+    - The comparators and container lookups still accept `nullptr` in C++20 mode, because they
+      take `std::basic_string_view` (Q-24).
+  - **Deviation from the plan.** The plan put the Requirements change and the comparison list in
+    the docs. The smoke-target paragraph in "Language standard" also needed updating, since it
+    described a single translation unit.
+- **M1 checkpoint:** re-plan (§3.4). Done: the M1 retrospective is in §10.
 
 ### M2: Build foundation and CI (weeks 2–4)
 
 *What you will learn:* CMake presets and options; GitHub Actions workflows, jobs, matrices,
 runners and containers; required status checks and rulesets; Dependabot; least-privilege tokens.
 
-#### T4: CMake hygiene
-- **Scope.**
-  - Replace the 4.0.2 minimum with a version range (Q-09).
-  - Rename the CMake project per Q-01, keeping `cstr_view` as an alias.
-  - Add options (prefix per Q-01) that build:
-    - the C++20 smoke check;
-    - the C++23 test suite;
-    - the demo.
-
-    They default to ON only when this is the top-level project.
-  - Look up fmt and GoogleTest only when something enabled needs them.
-  - Make the smoke check buildable without GoogleTest and without a C++23 compiler, with or without
-    fmt. Until T11 adds a switch, "without fmt" means fmt is not installed: the header uses fmt
-    whenever it can find it (F-7).
-  - Turn off module scanning for the project's targets.
-  - Add `CMakePresets.json` with developer presets (GCC, Clang, MSVC and clang-cl; Debug and
-    Release).
-  - In README's "Building & integrating" section and LEGENDUM's "Aedificatio":
-    - replace the `FetchContent` placeholder URL with `https://github.com/cpsusie/ct_string.git`;
-    - document the options and presets.
-- **Done when:**
-  - The default top-level build still builds and tests everything.
-  - A library-only configure succeeds on a machine without fmt or GoogleTest.
-  - A scratch consumer using `add_subdirectory` builds with neither installed.
-  - The project is verified with CMake 3.21 and the newest 4.x.
-  - Clang 19 builds without `clang-scan-deps`.
-  - README and LEGENDUM are updated.
+#### T4: CMake hygiene (NEXT TASK, planned in full)
+- **Goal.** A consumer using `add_subdirectory` or `FetchContent` gets only the header-only
+  library: no fmt, no GoogleTest, and CMake 3.21 or later. The project's own top-level build still
+  builds and tests everything, now through options and presets (D-017, D-018, F-6, Q-01, Q-09).
+- **What planning found.** A throwaway prototype, not committed, on 2026-10-11:
+  - **CMake 3.21 already works.** With only the minimum changed to `3.21...4.1`, CMake 3.21.4
+    (from PyPI) configures and builds the whole project with GCC 14, Ubuntu's GoogleTest 1.14 and
+    fmt 9.1, and all 175 tests pass. Nothing needs CMake 4 (F-6). The newest features in use are
+    `cxx_std_23` (CMake 3.20) and, once added, `PROJECT_IS_TOP_LEVEL` (3.21).
+  - **Module scanning (F-6) can be reproduced without uninstalling anything.** With CMake 4.1.3
+    and Clang 20, scanning is on. It works when `clang-scan-deps-20` is installed. When
+    `CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS` points at a missing file, configuring fails; with
+    scanning off, the same build succeeds.
+  - **What makes fmt and GoogleTest mandatory today.** `find_package(fmt CONFIG REQUIRED)` runs
+    first, the smoke target links `fmt::fmt-header-only`, and `find_package(GTest CONFIG
+    REQUIRED)` runs unconditionally (`CMakeLists.txt:13`, `:58`, `:76`).
+  - **The docs name the target `cstr_view`**: README "Building & integrating" (the `FetchContent`
+    and `add_subdirectory` examples) and "Language standard", and their LEGENDUM counterparts
+    ("Aedificatio et coniunctio", "Norma linguae").
+- **Branch:** `copilot/t4-cmake-hygiene`, from `develop-release_1`.
+- **Questions:** Q-09 (the CMake minimum) is needed. If it is still open when T4 starts, T4 uses
+  the default, 3.21, and asks again in its PR. Q-01 (names) is answered.
+- **Steps.**
+  1. **Version range.** `cmake_minimum_required` takes 3.21 as the minimum and the newest 4.x
+     verified as the policy maximum (Q-09).
+  2. **Names (Q-01).** The project and the INTERFACE target become `ct_string`, with two alias
+     targets: `ct_string::ct_string`, the name T9 exports, and `cstr_view`, so that existing
+     `target_link_libraries(... cstr_view)` keeps working. The smoke, test and demo targets keep
+     their names until T10 moves the suite and the demo.
+  3. **Options.** Three options with the `CT_STRING_` prefix build the C++20 smoke check, the
+     C++23 suite and the demo. Each defaults to `PROJECT_IS_TOP_LEVEL`. T4 logs the final names
+     as a decision.
+  4. **Dependencies, only when needed.**
+     - GoogleTest only when the suite is enabled.
+     - fmt, required, when the suite or the demo is enabled. The suite keeps D-029's expectation.
+     - The smoke check links fmt's header-only target if fmt is found, and builds without it
+       otherwise. Until T11, "without fmt" means fmt is not installed: the header uses fmt whenever
+       it can find it (F-7).
+  5. **Module scanning** is turned off on the project's own targets. The setting is ignored by
+     CMake versions before 3.28.
+  6. **`CMakePresets.json`**: configure, build and test presets for GCC, Clang, MSVC and clang-cl,
+     each in Debug and Release, with Ninja and build directories under `build/` (already ignored by
+     Git). It uses a preset schema that CMake 3.21 reads, so the minimum-CMake jobs in T6 can use
+     the same presets; T4 records the choice as a decision.
+  7. **Docs**, in README and LEGENDUM together:
+     - "Building & integrating" ("Aedificatio et coniunctio"): the real URL,
+       `https://github.com/cpsusie/ct_string.git`; the target `ct_string::ct_string`, with
+       `cstr_view` still accepted; the options; the presets; and CMake 3.21 as the minimum.
+     - "Language standard" ("Norma linguae"): the new target name.
+  8. **Plan and decisions.** D-017 follows the answer to Q-09. New decisions for the option names
+     and the preset schema. This plan: status, and T5 in full.
+- **Definition of done.**
+  - The default top-level build, with the presets and without them, still builds the smoke check,
+    the suite (175 tests, all passing) and the demo, in Debug and Release with `-Werror`, on GCC 14
+    and on Clang 20 with libstdc++.
+  - A configure with all three options off succeeds where neither fmt nor GoogleTest is installed.
+    This is verified in a container that has neither, and the PR shows how.
+  - The smoke check alone builds with fmt and without it, and with GCC 11.1, which has no C++23.
+  - A scratch consumer using `add_subdirectory` builds against `ct_string::ct_string` and against
+    `cstr_view`, in a container with neither dependency; none of the project's options is on
+    there. The same holds for `FetchContent` from a local path.
+  - CMake 3.21.4 and the newest 4.x from PyPI both configure, build and test the project.
+  - With CMake 4.x, Clang 19 and Clang 20 build the project when `clang-scan-deps` is unavailable,
+    simulated as above.
+  - README and LEGENDUM are updated in parallel.
+- **Out of scope.**
+  - Install and export rules, the package-config file and the version header (T9).
+  - Moving the suite and the demo into their own project (T10).
+  - A switch that turns fmt on or off (T11).
+  - CI (T5).
 
 #### T5: CI skeleton and security baseline
 - **Scope.**
@@ -458,6 +546,11 @@ runners and containers; required status checks and rulesets; Dependabot; least-p
   - libc++ jobs: Clang 17 with libc++ 17 (floor), and Clang 20 with libc++ 20.
     - Ubuntu's GoogleTest and fmt libraries are built for libstdc++. These jobs build GoogleTest
       against libc++, and use fmt header-only or build it too (found while planning T3).
+    - Ubuntu's libc++ 17 and 20 packages replace each other, so each job installs one and logs
+      `_LIBCPP_VERSION` (F-14).
+  - `std::format` per Q-25. By default: the build states where it expects `std::format`, so the
+    `CtSvFormatter.*` tests cannot silently vanish there (D-029, F-14).
+  - `nullptr` in the comparators and container lookups, per Q-24.
   - The suite under AddressSanitizer and UndefinedBehaviorSanitizer, with GCC 14 and Clang 20.
   - macOS `macos-15` with AppleClang, if Q-07 is yes.
   - README and LEGENDUM rows for libc++ and macOS.
@@ -667,7 +760,7 @@ Risk IDs use K-n, to avoid clashing with the requirement IDs (R-n) in §4.
 | # | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|---|
 | K-1 | An older MSVC toolset or a clang-cl rejects valid C++20 | Medium | Medium | Probe each one in T7. You decide between a workaround and dropping it (Q-06). |
-| K-2 | The test code has more libc++ differences | Low: a T3 prototype passed the whole suite with libc++ 20 | Low–Medium | T3 is limited to the library; test-code issues go to T8. |
+| K-2 | The test code has more libc++ differences | Low: in T3 the whole suite passed with libc++ 20, unchanged | Low–Medium | T3 is limited to the library; test-code issues go to T8. The one difference found, the `std::format` tests with libc++ 17 and 18, is Q-25. |
 | K-3 | Runner images change (compilers removed, `windows-2022` retired) | High over a year | Medium | Explicit labels, a weekly run (Q-21), toolchain versions logged; small PRs to adjust the matrix. |
 | K-4 | Docker Hub rate-limits `gcc:11.1` pulls | Low–Medium | Low | An access-token secret or a mirror (Q-17). |
 | K-5 | Registry reviewers ask for changes (naming, layout) | Medium | Medium | Follow their guides from the start (F-10). The in-repo port and recipe work in the meantime. |
@@ -699,9 +792,10 @@ Risk IDs use K-n, to avoid clashing with the requirement IDs (R-n) in §4.
 | Task | Status | PR | Notes |
 |---|---|---|---|
 | T1 | Merged | #14 | Plan, decisions, questions, findings. You then answered Q-01, Q-06, Q-16 and Q-21. |
-| T2 | In review | this PR | fmt tests restored, with a guard (D-029); the four answers recorded; Q-22 and Q-23 added for T3 |
-| T3 | Next: planned in full | — | Q-22 and Q-23 have defaults; neither blocks it |
-| T4–T21 | Planned (outline) | — | Each is detailed in the PR of the task before it |
+| T2 | Merged | #15 | fmt tests restored, with a guard (D-029); the four answers recorded; Q-22 and Q-23 added for T3. You then refined the Latin (#16). |
+| T3 | In review | this PR | Comparisons compile with libc++ 17+ (D-030); misnamed concept fixed (D-031); 175 tests; Q-24 and Q-25 added for T8 |
+| T4 | Next: planned in full | — | Needs Q-09 (default 3.21) |
+| T5–T21 | Planned (outline) | — | Each is detailed in the PR of the task before it |
 
 ### M0 retrospective (written in T2)
 
@@ -714,6 +808,27 @@ Risk IDs use K-n, to avoid clashing with the requirement IDs (R-n) in §4.
 - **Risks.** K-2 is now Low, since a T3 prototype passed the whole suite with libc++ 20. K-12 is
   Low once you switch the default branch after T5.
 - **Timeline.** Unchanged: week 1 started on 2026-10-10, with T2 and T3.
+
+### M1 retrospective (written in T3)
+
+- **What went well.**
+  - Both M1 tasks fixed a defect found while planning, and both PRs came with tests that fail
+    without the fix: a guard that stops the build (T2, D-029), and compile-time checks that fail
+    on the old headers (T3).
+  - Planning T3 in full, with a prototype, paid off: the design held, and the four answers needed
+    no rework.
+  - M1 finished inside week 1, as planned.
+- **What changed.**
+  - T3 adds a second translation unit to the smoke target. Every toolchain that checks the C++20
+    floor now also checks what the two class templates compare with.
+  - Verifying T3 found three things that were not planned (F-14): Ubuntu's libc++ packages
+    replace each other, libc++ 17 and 18 drop `std::formatter` (Q-25), and the comparators and
+    container lookups still take `nullptr` in C++20 mode (Q-24). Both questions are needed by T8,
+    so they block nothing now.
+  - Planning T4 with a prototype showed that CMake 3.21 already builds the project as it is. The
+    risk in T4 is the option and dependency wiring, not the version.
+- **Risks.** K-2 stays Low: the suite passed with libc++ 20 unchanged. No new risk.
+- **Timeline.** Unchanged. M2 starts with T4 in week 2.
 
 Later milestone retrospectives will be added here.
 

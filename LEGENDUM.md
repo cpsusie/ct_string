@@ -134,8 +134,17 @@ constexpr auto ctsv = "hello"_ctsv;     // basic_ct_string_view<char, true> == c
 static_assert(fs.size()    == 5);
 static_assert(ctsv.size()  == 5);
 static_assert(ctsv.known_cstr);
-static_assert(ctsv == fs);              // also == "hello", == std::string_view{"hello"}, ...
+static_assert(ctsv == fs);              // either order; also !=, <, <=>, ...
+static_assert(ctsv == "hello" && fs == "hello");
 ```
+
+Utrumque genus cum altero confertur, cuiusvis speciei et magnitudinis, atque cum his:
+
+- cum litteralibus, et cum areis vel indicibus sui generis characterum, sive `const` sive non; quae usque ad primum characterem nullum leguntur;
+- cum `std::basic_string` et `std::basic_string_view` eiusdem generis characterum;
+- cum quavis alia re quae in `std::basic_string_view` eius generis characterum sine exceptione convertitur.
+
+Altera pars utrimque poni potest; `==`, `!=`, `<`, `<=`, `>`, `>=`, `<=>` omnia valent. Omnes hae comparationes `noexcept` sunt, quacumque bibliotheca standard utaris. Chordae alterius generis characterum, atque `nullptr`, compositionis tempore recusantur. Ut in `std::basic_string_view`, index `nullptr` esse non debet, et area vel index nullo charactere terminari debet.
 
 Nomina commodiora:
 
@@ -877,7 +886,7 @@ target_compile_features(... PRIVATE cxx_std_23)
 
 petitur; `CMAKE_CXX_STANDARD` totius operis non tollitur.
 
-Ne hae duae res paulatim confundantur, build continet bibliothecam staticam `cstr_view_cxx20_smoke`: unum translation unit, [`tests/cxx20_header_smoke.cpp`](tests/cxx20_header_smoke.cpp), quod omnia capita publica includit, formas instantiat, atque C++20 firmiter retinet. Si quid C++23 tantum in `inc/ct_str` ingreditur, hic target statim frangitur; non exspectatur donec usor instrumento vetustiore laboret.
+Ne hae duae res paulatim confundantur, build continet bibliothecam staticam `cstr_view_cxx20_smoke`, quae C++20 firmiter retinet. Unum eius translation unit, [`tests/cxx20_header_smoke.cpp`](tests/cxx20_header_smoke.cpp), omnia capita publica includit formasque instantiat. Alterum, [`tests/cxx20_comparison_checks.cpp`](tests/cxx20_comparison_checks.cpp), solis probationibus compositionis tempore constat: quibuscum duo genera conferantur, quibuscum non. Si quid C++23 tantum in `inc/ct_str` ingreditur, aut si qua comparatio ab una bibliotheca standard recusatur, hic target statim frangitur; non exspectatur donec usor instrumento vetustiore laboret.
 
 ---
 
@@ -892,7 +901,8 @@ Ne hae duae res paulatim confundantur, build continet bibliothecam staticam `cst
 - In Linux/x86_64 verificatum cum **GCC 13**, GCC 14, Clang 19; bibliotheca C++20, probationes C++23.
 - GCC 13 terminus inferior consulto est: eius libstdc++ `std::ranges::to` (P1206R7) nondum habet; quare neque bibliotheca neque probationes eo niti possunt.
 - Cum `fmtlib` et sine eo probatum.
-- `std::formatter`, si adhibetur, `<format>` requirit atque `__cpp_lib_format >= 201907L`.
+- Praeter libstdc++ et STL MSVC, etiam **libc++ 17** et posteriores adhiberi possunt. Hoc in Linux/x86_64 domi verificatum est, cum Clang 17 + libc++ 17 et cum Clang 20 + libc++ 20; cum posteriore etiam probationes C++23 succedunt. CI libc++ nondum probat.
+- `std::formatter`, si adhibetur, `<format>` requirit atque `__cpp_lib_format >= 201907L`. libc++ hoc macro a versione 19 demum definit; cum libc++ 17 et 18 igitur `std::formatter` omittitur.
 - Membrum `contains`, si standard praesto est, `string_view::contains` utitur (`__cpp_lib_string_contains >= 202011L`); aliter per `find` efficitur.
 
 ---

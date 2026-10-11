@@ -207,7 +207,8 @@ reused, so they may appear out of numeric order.
   would go untested on Windows.
 
 ### D-024 libc++ incompatibility is a bug, fixed whatever the macOS scope
-- **Date:** 2026-10-10. **Status:** Accepted (T1, PR #14). **Related:** T3, T8, F-5, Q-07, Q-22.
+- **Date:** 2026-10-10. **Status:** Accepted (T1, PR #14). **Related:** T3, T8, F-5, Q-07, Q-22,
+  D-030.
 - **Decision:**
   - Fix the comparison operators so they compile with any conforming standard library, keeping
     their meaning and an accurate `noexcept`.
@@ -217,14 +218,87 @@ reused, so they may appear out of numeric order.
   - The current code depends on a vendor-specific `noexcept` strengthening, which contradicts the
     brief's "rely on standard C++".
   - It blocks every libc++ user, including Conan profiles that use libc++.
-- **How:** the design is Q-22. T3's PR records it as a new decision.
+- **How:** the design is D-030 (Q-22, answered in T3).
+
+---
+
+## Library design
+
+### D-030 The comparison operators name arrays and pointers of their own character type, and never accept `nullptr`
+- **Date:** 2026-10-11. **Status:** Proposed. **Related:** T3, F-5, D-024, Q-22, Q-24.
+- **Context:**
+  - Four operator templates, `operator==` and `operator<=>` in `basic_ct_string_view` and in
+    `basic_fixed_string`, accepted an operand only if it was nothrow-convertible to the string
+    view (F-5).
+  - Literals, arrays and pointers convert through `std::basic_string_view`'s constructor from a
+    pointer. The standard does not make it `noexcept`; libstdc++ and the MSVC STL do, libc++ does
+    not. With libc++ these comparisons did not compile.
+  - With libstdc++ in C++20 mode, `view == nullptr` compiled and then had undefined behaviour.
+    C++23 (P2166) and libc++ reject it.
+- **Decision (Q-22, answered with the default, option a):**
+  - One constraint, `detail::string_view_comparand` (`fixed_string.hpp`), is used by all four
+    templates. It is not part of the public API.
+  - It accepts arrays of, and pointers to, the class's own character type, `const` or not, by
+    name. It also accepts, as before, anything else that converts to `std::basic_string_view` of
+    that character type without throwing.
+  - It rejects `std::nullptr_t`, on every standard library and language version.
+  - The operators stay unconditionally `noexcept`. Their meaning is unchanged: the other operand is
+    converted to a string view, so an array or a pointer is read up to its first null character.
+  - The constraint checks the conversion of `const T&`, which is what the operators' bodies
+    convert, rather than of the deduced type `T`. For every documented operand the answer is the
+    same. Only a type that converts from an rvalue but not from a `const` lvalue behaves
+    differently: before, the operator was chosen and then failed to compile; now it is not a
+    candidate.
+- **Why:**
+  - The accepted operands, and `noexcept`, are the same on every standard library (D-024).
+  - `noexcept` is accurate. The conversion of an array or a pointer cannot throw; its only
+    precondition, a null character, is the caller's, exactly as with `std::basic_string_view`.
+  - Types whose conversion can throw stay non-comparable, as before.
+  - Comparing with `nullptr` is never valid, so a compile error replaces undefined behaviour.
+  - Sharing one constraint keeps the two class templates from drifting apart.
+- **Verified (T3):**
+  - Tests were written first. On the old headers, the new compile-time checks fail with libc++
+    (20 errors) and, with libstdc++ in C++20 mode, at the `nullptr` and Q-23 assertions.
+  - The C++20 smoke target, with the new checks, builds with `-Werror` on GCC 11.1 (official
+    container), 12, 13 and 14; Clang 17, 18 and 20 with libstdc++; Clang 17 + libc++ 17; and
+    Clang 20 + libc++ 20. The checks also pass in C++23 mode.
+  - The suite (175 tests) passes on GCC 14 and Clang 20 with libstdc++, Debug and Release, and on
+    Clang 20 + libc++ 20 with GoogleTest built against libc++. The demo passes everywhere it was
+    built, including libc++ 20 with fmt used header-only.
+- **Alternatives:**
+  - Q-22 option (b): plain convertibility with a conditional `noexcept`. `noexcept(view == "x")`
+    would then be false with libc++ only, and types whose conversion can throw would become
+    comparable.
+  - A separate constraint in each class. The two could drift apart.
+  - A public concept. It would add a name that Semantic Versioning then freezes after 1.0.
+- **Not covered:** `ctsv_comparators.hpp` and the container lookups take
+  `std::basic_string_view`, so they follow its rules: in C++20 mode they still accept `nullptr`
+  (Q-24).
+
+### D-031 Public concepts next to `nothrow_convertible_to`: fix the misnamed one, keep all four
+- **Date:** 2026-10-11. **Status:** Proposed. **Related:** T3, Q-23.
+- **Context:** `fixed_string.hpp` defines four public concepts that nothing in the library, the
+  tests or the demo used. One, `not_exact_same_nothrow_convertible_to`, did not check `noexcept`,
+  despite its name.
+- **Decision (Q-23, option a):**
+  - `not_exact_same_nothrow_convertible_to<T1, T2>` now means `not_exact_same_convertible_to<T1, T2>`
+    and `nothrow_convertible_to<T1, T2>`, as its name says.
+    `tests/cxx20_comparison_checks.cpp` checks it with a type whose conversion can throw and one
+    whose conversion cannot.
+  - The other three concepts stay as they are.
+- **Why:**
+  - After 1.0, Semantic Versioning would freeze the wrong meaning.
+  - Nothing used the concept, so the fix breaks nothing here. Code elsewhere that used it gets the
+    meaning its name promised.
+  - Removing public names is a larger change than this task needs.
+- **Alternatives:** remove all four before 1.0 (Q-23 b); leave them as they are (Q-23 c).
 
 ---
 
 ## Testing
 
 ### D-029 A test guarded by a feature macro fails the build, rather than vanishing, when the build expects the feature
-- **Date:** 2026-10-11. **Status:** Proposed. **Related:** T2, T5, T11, F-4, Q-02.
+- **Date:** 2026-10-11. **Status:** Accepted (T2, PR #15). **Related:** T2, T5, T11, F-4, Q-02.
 - **Context:**
   - The three fmt tests were wrapped in `#if defined(CJM_CT_STRING_VIEW_HAS_FMT)`, a macro that
     nothing defines (F-4). The preprocessor dropped them without a word, and every run stayed

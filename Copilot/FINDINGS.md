@@ -4,6 +4,7 @@
 > This file records facts and measurements only. The decisions drawn from them are in
 > [DECISIONS.md](DECISIONS.md), and the plan that acts on them is in [PLAN.md](PLAN.md).
 > Runner images and compilers change, so re-check any finding before relying on it months later.
+> F-14 was added on 2026-10-11, during T3.
 
 ## F-1 Repository baseline
 
@@ -124,6 +125,10 @@ also works today, but that is not promised (decision D-008).
 - **Assessment.** This is a conformance defect: the library depends on behaviour the standard does
   not guarantee, which goes against the brief's "rely on standard C++". It is fixed in T3
   (decision D-024).
+- **Outcome (T3, 2026-10-11).** Fixed as D-030 describes. The smoke target, now with a second
+  translation unit of compile-time comparison checks, builds with Clang 17 + libc++ 17 and with
+  Clang 20 + libc++ 20. With Clang 20 + libc++ 20, the whole suite (175 tests) passes, and so does
+  the demo with fmt used header-only. What T3 found on the way is in F-14.
 
 ## F-6 CMake findings
 
@@ -265,3 +270,25 @@ therefore gets in-repo vcpkg and Conan configurations instead (decision D-022, q
   STL that accepts it (F-9).
 - Sources: the Visual Studio 2022 Build Tools component list in `MicrosoftDocs/visualstudio-docs`,
   and the Visual Studio component tables in the `actions/runner-images` software lists.
+
+## F-14 libc++ details found while verifying T3 (checked 2026-10-11)
+
+- **Ubuntu packages.** On Ubuntu 24.04, `libc++-17-dev` and `libc++-20-dev` cannot be installed
+  together: installing one removes the other. Both put their headers behind
+  `/usr/include/c++/v1`, and every `clang++-N -stdlib=libc++` then uses whichever is installed.
+  Check `_LIBCPP_VERSION` before trusting a result. T8's libc++ jobs need one libc++ per job, or
+  explicit include and library paths.
+- **`std::format`.** libc++ 17 and 18 ship `<format>`, but do not define `__cpp_lib_format`
+  (their `<version>` has the line commented out). libc++ 19 and later define it (`202110L` in
+  libc++ 20). Checked: libc++ 17 and 20 locally, 18 and 19 in the LLVM `release/18.x` and
+  `release/19.x` sources.
+  - The library's `std::formatter` is guarded by that macro (`ct_string_view.hpp:18`, `:794`), so
+    with libc++ 17 or 18 it is left out.
+  - The suite's `std::format` tests have the same guard (`tests/cstr_view_tests.cpp`, the
+    `CtSvFormatter` block). With Clang 20 and libc++ 17, 168 of the 175 tests ran, the seven
+    `CtSvFormatter.*` tests were silently missing, and the run was green: the F-4 pattern (Q-25).
+- **`nullptr`.** In C++20 mode, with libstdc++ 14 and with libc++ 20, `std::basic_string_view`
+  converts from `nullptr`. C++23 (P2166) removes that conversion. The comparators' concept
+  `ctsv_lookup_key` and the container lookups therefore accept `nullptr` in C++20 mode (Q-24).
+- **Clang 16** still fails the smoke target, with the same compiler bug as in F-2. T3 did not
+  change that.

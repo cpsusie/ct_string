@@ -10,9 +10,10 @@ questions.
   relying on the default.
 - **Where answers go.** Copilot records each answer below, in the next task's PR, and updates the
   matching decision in [DECISIONS.md](DECISIONS.md). The answers you gave after T1 was merged
-  (Q-01, Q-06, Q-16 and Q-21) are recorded in the T2 PR.
-- **New in T2:** Q-22 and Q-23, both about T3. Each has a default, so neither blocks T3. Of the
-  older questions, Q-09 is the next one needed (by T4).
+  (Q-01, Q-06, Q-16 and Q-21) are recorded in the T2 PR. Your answers to Q-22 and Q-23, given when
+  T3 started, are recorded in the T3 PR.
+- **New in T3:** Q-24 and Q-25, both found while verifying T3 and both needed by T8. Of the older
+  questions, Q-09 is the next one needed (by T4).
 
 ## Summary
 
@@ -39,8 +40,10 @@ questions.
 | Q-19 | Community files and documentation hosting | T17 | Add CONTRIBUTING and SECURITY files and issue templates; no separate docs site | Open |
 | Q-20 | Visual Studio flags for the C++23 suite | T7 | "/cpplang" means `/std:c++latest`; VS 2026 required, VS 2022 17.14 best-effort | Open |
 | Q-21 | Default branch during the project | T5 | Make `develop-release_1` the default branch from T5 until the release, so weekly and manual runs, Dependabot and the PR template work | **Answered:** default (a), switched by you when T5 merges |
-| Q-22 | How T3 makes comparisons portable to libc++ | T3 | Accept arrays of, and pointers to, the view's own character type by name; keep `noexcept`; reject `nullptr` everywhere | Open |
-| Q-23 | A misnamed public concept, and three unused ones | T3 | Fix the misnamed one in T3; keep the three unused ones | Open |
+| Q-22 | How T3 makes comparisons portable to libc++ | T3 | Accept arrays of, and pointers to, the view's own character type by name; keep `noexcept`; reject `nullptr` everywhere | **Answered:** default (D-030) |
+| Q-23 | A misnamed public concept, and three unused ones | T3 | Fix the misnamed one in T3; keep the three unused ones | **Answered:** (a), as Copilot reads your note; please confirm (D-031) |
+| Q-24 | `nullptr` in the comparators and container lookups | T8 | Reject it there too, as D-030 does for the comparison operators | Open |
+| Q-25 | `std::formatter` with libc++ 17 and 18 | T8 | Keep the standard feature test, and document the gap; T8 makes the `std::format` tests impossible to lose silently | Open |
 
 ---
 
@@ -350,7 +353,10 @@ questions.
     - `view == nullptr` would also start compiling with libc++ in C++20 mode, unless excluded.
 - **Also recommended, with either option:** reject `nullptr` on every library and language
   version, since comparing with it is never valid.
-- **Answer:** _pending_. T3's PR logs the result as a decision.
+- **Answer (2026-10-11, when T3 started):** the default. In your words: "Accept arrays of, and
+  pointers to, the view's own character type by name; keep noexcept; reject nullptr everywhere."
+  Recorded as D-030. "Everywhere" is applied to the four operators named in the context above.
+  The comparators and container lookups, which also accept `nullptr` in C++20 mode, are Q-24.
 
 ### Q-23 A misnamed public concept, and three unused ones
 - **Context.** `fixed_string.hpp` (lines 52–63) defines four concepts in the public namespace
@@ -364,4 +370,48 @@ questions.
     check `noexcept` as its name says, with a compile-time test. Keep the other three.
   - (b) Remove all four before 1.0.
   - (c) Leave them as they are.
+- **Answer (2026-10-11, when T3 started):** you wrote: "Also note that in the nothrow_convertible_to
+  concept, presently used is nothrow_convertibe_to". Copilot reads this as pointing at the defect
+  above, the `nothrow` concept that does not check `noexcept`, and so as option (a). No identifier
+  spelled `convertibe` exists in the repository. T3 applies (a), recorded as D-031. **Please
+  confirm in the review**, or say what you meant instead.
+
+### Q-24 `nullptr` in the comparators and container lookups
+- **Context.** D-030 makes the four comparison operators reject `nullptr` on every standard
+  library and language version. Two other parts of the library take a `std::basic_string_view`,
+  so they follow its rules. In C++20 mode they accept `nullptr`, with libstdc++ and with libc++,
+  and the call then has undefined behaviour. C++23 (P2166) rejects it. T3 checked this with GCC 14
+  and with Clang 20 + libc++ 20.
+  - **Comparators** (`ctsv_comparators.hpp`): `std::nullptr_t` satisfies `ctsv_lookup_key`
+    (line 94), so `ctsv_less<char>{}(view, nullptr)` compiles.
+  - **Container lookups** (`ctsv_containers.hpp`): `find`, `at`, `at_if`, `contains`, `count`,
+    `erase`, `equal_range`, `lower_bound` and `upper_bound` take the key as a string view by value,
+    so `set.contains(nullptr)` compiles. There are 40 such declarations across the four wrappers.
+- **Options:**
+  - (a) **Recommended.** Reject it there too, so no comparison or lookup in the library accepts
+    `nullptr`. In the comparators this is one line in the concept. In the containers it is one
+    deleted `std::nullptr_t` overload per lookup member. Both get compile-time tests.
+  - (b) Reject it in the comparators only, which is one line, and document that container lookups
+    follow `std::basic_string_view`.
+  - (c) Leave both, and document it. C++23 code is already protected.
+- **When.** In T8, which also runs the suite under the sanitizers, unless you would rather have it
+  in the T3 PR.
+- **Answer:** _pending_
+
+### Q-25 `std::formatter` with libc++ 17 and 18
+- **Context.** `ct_string_view.hpp` provides `std::formatter` only when
+  `__cpp_lib_format >= 201907L`, the standard feature test.
+  - libc++ 17 and 18 ship `<format>`, but do not define that macro. libc++ 19 and later do. T3
+    checked libc++ 17 and 20 locally, and libc++ 18 and 19 in the LLVM sources.
+  - So with libc++ 17 or 18, `std::format("{}", view)` does not compile. The suite's seven
+    `CtSvFormatter.*` tests are then silently left out, as the fmt tests were in F-4. With Clang
+    20 and libc++ 17, 168 of the 175 tests ran, and the run was green.
+  - T3 documents the gap in README and LEGENDUM ("Requirements").
+- **Options:**
+  - (a) **Recommended.** Keep the standard feature test. In T8, apply D-029 to `std::format`: the
+    build states where it expects `std::format`, so the tests cannot vanish there. In the planned
+    jobs the suite runs with libc++ 20 only, which defines the macro.
+  - (b) Also provide `std::formatter` with libc++ 17 and 18, by checking the libc++ version. This
+    is a vendor-specific check, against the brief's "rely on standard C++" (D-024), and needs a
+    suite job with those versions.
 - **Answer:** _pending_
