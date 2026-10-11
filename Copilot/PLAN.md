@@ -353,8 +353,8 @@ my standard library" is not the same as standard C++.
     the result in CI.
 - **Outcome.**
   - **Answers.** Q-22: the default, recorded as D-030. Q-23: option (a), as Copilot reads your note,
-    recorded as D-031; please confirm. Q-24: option (a), which you asked for in the review,
-    recorded as D-032.
+    recorded as D-031; you confirmed that reading in the review. Q-24: option (a), which you asked
+    for in the review, recorded as D-032.
   - **Library.** One non-public constraint, `detail::string_view_comparand` in `fixed_string.hpp`,
     is used by all four templates. It names arrays and pointers of the class's own character type,
     keeps "anything else nothrow-convertible", and rejects `nullptr`. The operators stay

@@ -42,7 +42,7 @@ questions.
 | Q-20 | Visual Studio flags for the C++23 suite | T7 | "/cpplang" means `/std:c++latest`; VS 2026 required, VS 2022 17.14 best-effort | Open |
 | Q-21 | Default branch during the project | T5 | Make `develop-release_1` the default branch from T5 until the release, so weekly and manual runs, Dependabot and the PR template work | **Answered:** default (a), switched by you when T5 merges |
 | Q-22 | How T3 makes comparisons portable to libc++ | T3 | Accept arrays of, and pointers to, the view's own character type by name; keep `noexcept`; reject `nullptr` everywhere | **Answered:** default (D-030) |
-| Q-23 | A misnamed public concept, and three unused ones | T3 | Fix the misnamed one in T3; keep the three unused ones | **Answered:** (a), as Copilot reads your note; please confirm (D-031) |
+| Q-23 | A misnamed public concept, and three unused ones | T3 | Fix the misnamed one in T3; keep the three unused ones | **Answered:** (a), Copilot's reading of your note, which you confirmed (D-031) |
 | Q-24 | `nullptr` in the comparators and container lookups | T8 | Reject it there too, as D-030 does for the comparison operators | **Answered:** (a), applied in T3 at your request (D-032) |
 | Q-25 | `std::formatter` with libc++ 17 and 18 | T8 | Keep the standard feature test, and document the gap; T8 makes the `std::format` tests impossible to lose silently | Open |
 | Q-26 | `nullptr` in the view's members that mirror `std::basic_string_view` | T8 | Reject it in the 11 overloads where it is always undefined behaviour | Open |
@@ -376,8 +376,9 @@ questions.
 - **Answer (2026-10-11, when T3 started):** you wrote: "Also note that in the nothrow_convertible_to
   concept, presently used is nothrow_convertibe_to". Copilot reads this as pointing at the defect
   above, the `nothrow` concept that does not check `noexcept`, and so as option (a). No identifier
-  spelled `convertibe` exists in the repository. T3 applies (a), recorded as D-031. **Please
-  confirm in the review**, or say what you meant instead.
+  spelled `convertibe` exists in the repository. T3 applies (a), recorded as D-031. Copilot asked
+  you to confirm this reading in the review.
+  - **Confirmed (2026-10-11, in the T3 PR):** you answered "yes".
 
 ### Q-24 `nullptr` in the comparators and container lookups
 - **Context.** D-030 makes the four comparison operators reject `nullptr` on every standard

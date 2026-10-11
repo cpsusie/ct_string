@@ -290,7 +290,7 @@ reused, so they may appear out of numeric order.
 - **Context:** `fixed_string.hpp` defines four public concepts that nothing in the library, the
   tests or the demo used. One, `not_exact_same_nothrow_convertible_to`, did not check `noexcept`,
   despite its name.
-- **Decision (Q-23, option a):**
+- **Decision (Q-23, option a; you confirmed Copilot's reading of your answer in the T3 PR):**
   - `not_exact_same_nothrow_convertible_to<T1, T2>` now means `not_exact_same_convertible_to<T1, T2>`
     and `nothrow_convertible_to<T1, T2>`, as its name says.
     `tests/cxx20_comparison_checks.cpp` checks it with a type whose conversion can throw and one
