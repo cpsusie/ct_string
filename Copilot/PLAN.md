@@ -1,6 +1,7 @@
 # Development and release plan: `ct_string`
 
-> **Status:** T1 merged (PR #14). T2 in review; T3 planned in full. **Last updated:** 2026-10-11.
+> **Status:** T1 merged (PR #14), so M0 is done (retrospective in §10). T2 in review; T3 planned in
+> full. **Last updated:** 2026-10-11.
 > **Approver:** @cpsusie. **Author:** Copilot.
 > **Brief:** [develop-release-project.md](develop-release-project.md).
 > **Companion documents:**
@@ -702,7 +703,19 @@ Risk IDs use K-n, to avoid clashing with the requirement IDs (R-n) in §4.
 | T3 | Next: planned in full | — | Q-22 and Q-23 have defaults; neither blocks it |
 | T4–T21 | Planned (outline) | — | Each is detailed in the PR of the task before it |
 
-Milestone retrospectives will be added here.
+### M0 retrospective (written in T2)
+
+- **What went well.** T1 was merged within a day, after two review rounds. For each of the four
+  questions you answered, you accepted the recommended default, so the plan needed no rework.
+- **What changed.** Your reviews added the CI gate check, the rulesets, the Dependabot settings,
+  clang-cl pinning and the promotion of the docs after the release. Planning T3 then corrected the
+  outline: four operator templates need changing, not "12 uses". It also found the `nullptr`
+  difference (Q-22) and a misnamed public concept (Q-23).
+- **Risks.** K-2 is now Low, since a T3 prototype passed the whole suite with libc++ 20. K-12 is
+  Low once you switch the default branch after T5.
+- **Timeline.** Unchanged: week 1 started on 2026-10-10, with T2 and T3.
+
+Later milestone retrospectives will be added here.
 
 ## 11. Backlog (after 1.0)
 
