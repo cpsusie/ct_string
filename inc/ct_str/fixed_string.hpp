@@ -59,8 +59,32 @@ namespace cps::ct_string
     concept not_same_unqual_type_nothrow_convertible_to = not_same_unqual_type_convertible_to<T1, T2>
         && nothrow_convertible_to<T1, T2>;
 
+    /// \brief T1 is not exactly T2, and converts to T2 without throwing.
     template<typename T1, typename T2>
-    concept not_exact_same_nothrow_convertible_to = !std::same_as<T1, T2> && std::convertible_to<T1, T2>;
+    concept not_exact_same_nothrow_convertible_to = not_exact_same_convertible_to<T1, T2>
+        && nothrow_convertible_to<T1, T2>;
+
+    namespace detail
+    {
+        /// \brief T decays to a pointer to TChar or to const TChar. Satisfied by such
+        /// pointers and by arrays of TChar or const TChar, string literals included.
+        template<typename T, typename TChar>
+        concept own_char_array_or_pointer = std::same_as<std::decay_t<T>, const TChar*>
+            || std::same_as<std::decay_t<T>, TChar*>;
+
+        /// \brief The operands, other than their own kind, with which basic_fixed_string and
+        /// basic_ct_string_view of character type TChar compare: arrays of and pointers to
+        /// TChar (named here because the standard does not make their conversion to
+        /// std::basic_string_view noexcept, so some standard libraries do not), and anything
+        /// else whose const lvalue converts to std::basic_string_view<TChar> without throwing
+        /// (the operators take it by const reference). nullptr is
+        /// never accepted. Both class templates use this one constraint, so they cannot
+        /// drift apart.
+        template<typename T, typename TChar>
+        concept string_view_comparand = !std::same_as<wo_qual_t<T>, std::nullptr_t>
+            && (own_char_array_or_pointer<const T&, TChar>
+                || nothrow_convertible_to<const T&, std::basic_string_view<TChar>>);
+    }
 
     /// \brief A type from which a std::string can be constructed AND to which a
     /// std::string can be assigned.
@@ -346,10 +370,15 @@ namespace cps::ct_string
             return get_std_sv() <=> other.get_std_sv();
         }
 
-        /// basic_fixed_strings are equality comparable with anything nothrow convertible to a basic_string_view
-        /// of the same character and traits type.  The basic_fixed_string's null terminator character is not
-        /// considered
-        template<nothrow_convertible_to<std_sv_type> TOther>
+        /// basic_fixed_strings are equality comparable with string literals, arrays and pointers of
+        /// char_type (const or not), and with anything else nothrow convertible to a basic_string_view
+        /// of the same character and traits type, such as a std::basic_string or a
+        /// std::basic_string_view.  \param other is first converted to a basic_string_view: an array or
+        /// a pointer is read up to its first null character.  The basic_fixed_string's null terminator
+        /// character is not considered.
+        /// \remarks Comparing with nullptr does not compile.  As with std::basic_string_view, behavior is
+        /// undefined if a pointer is null, or if an array or a pointer is not null-terminated.
+        template<detail::string_view_comparand<char_type> TOther>
             requires (!basic_fixed_string_type<TOther>)
         constexpr bool operator==(const TOther& other) const noexcept
         {
@@ -357,10 +386,14 @@ namespace cps::ct_string
             return get_std_sv() == other_sv;
         }
 
-        /// Basic fixed strings form a strict total order with anything nothrow convertible to a std::basic_string_view
-        /// of the same character and traits_type.  \param other is first converted to a basic_string_view before
-        /// the comparison.  The basic_fixed_string's null terminator is not considered.
-        template<nothrow_convertible_to<std_sv_type> TOther>
+        /// Basic fixed strings form a strict total order with the same operands as operator== accepts:
+        /// string literals, arrays and pointers of char_type, and anything else nothrow convertible to a
+        /// std::basic_string_view of the same character and traits_type.  \param other is first converted
+        /// to a basic_string_view before the comparison.  The basic_fixed_string's null terminator is not
+        /// considered.
+        /// \remarks Comparing with nullptr does not compile.  As with std::basic_string_view, behavior is
+        /// undefined if a pointer is null, or if an array or a pointer is not null-terminated.
+        template<detail::string_view_comparand<char_type> TOther>
             requires (!basic_fixed_string_type<TOther>)
         constexpr std::strong_ordering operator<=>(const TOther& other) const noexcept
         {

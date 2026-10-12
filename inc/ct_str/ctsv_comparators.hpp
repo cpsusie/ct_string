@@ -80,7 +80,10 @@ namespace cps::ct_string
     /// Satisfied by: either flavor of basic_ct_string_view<TChar, *>,
     /// std::basic_string_view<TChar>, std::basic_string<TChar>,
     /// basic_fixed_string<TChar, N>, and a null-terminated const TChar*
-    /// (including string literals).
+    /// (including string literals). Never satisfied by std::nullptr_t, on any
+    /// standard library or language version (D-032): in C++20,
+    /// std::basic_string_view still converts from nullptr, and the comparison
+    /// would then have undefined behaviour.
     ///
     /// \remarks Raw pointers are deliberately admitted even though the
     /// standard does NOT mark std::basic_string_view(const CharT*) noexcept
@@ -92,7 +95,8 @@ namespace cps::ct_string
     /// comparators remain correct.
     template<typename T, typename TChar>
     concept ctsv_lookup_key =
-        std_char<TChar> && std::convertible_to<const T&, std::basic_string_view<TChar>>;
+        std_char<TChar> && !std::same_as<wo_qual_t<T>, std::nullptr_t>
+        && std::convertible_to<const T&, std::basic_string_view<TChar>>;
 
     /// \brief A ctsv_lookup_key whose conversion to std::basic_string_view is
     /// additionally noexcept. Drives the conditional noexcept on every
