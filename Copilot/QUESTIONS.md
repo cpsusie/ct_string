@@ -46,6 +46,7 @@ questions.
 | Q-24 | `nullptr` in the comparators and container lookups | T8 | Reject it there too, as D-030 does for the comparison operators | **Answered:** (a), applied in T3 at your request (D-032) |
 | Q-25 | `std::formatter` with libc++ 17 and 18 | T8 | Keep the standard feature test, and document the gap; T8 makes the `std::format` tests impossible to lose silently | Open |
 | Q-26 | `nullptr` in the view's members that mirror `std::basic_string_view` | T8 | Reject it in the 11 overloads where it is always undefined behaviour | Open |
+| Q-27 | Checking that the deleted `nullptr` overloads are the ones chosen | T8 | A compile-fail check run by CTest, added in T8 with Q-26 | Open |
 
 ---
 
@@ -407,6 +408,11 @@ questions.
   - A literal `0` is rejected too.
   - The view's own members that mirror `std::basic_string_view` are neither comparators nor
     container lookups. They are Q-26.
+  - **Revised in review (2026-10-12).** Codex's review of PR #17 found that the container twins,
+    as first written with a concrete `std::nullptr_t` parameter, also rejected `m.contains({})`, a
+    valid lookup of the empty key, and keys that convert to `std::nullptr_t` as well as to a string
+    view. The twins now deduce their parameter, which fixes both. The answer is unchanged: see
+    D-032, "Revised in review".
 
 ### Q-25 `std::formatter` with libc++ 17 and 18
 - **Context.** `ct_string_view.hpp` provides `std::formatter` only when
@@ -448,5 +454,31 @@ questions.
     calls that can never be valid. A pointer variable that happens to be null is still undefined
     behaviour at run time, as with the standard type.
   - (b) Keep mirroring `std::basic_string_view` exactly, and leave the documentation as it is.
+- **Note (2026-10-12, from the review of PR #17).** D-032's container twins became deduced
+  templates, because a concrete `std::nullptr_t` parameter also caught `{}`, which there was a
+  valid lookup of the empty key. Here, as for `std::hash`, the concrete form is the right one.
+  `v.compare({})` and `v.compare(pos1, count1, {})` compile today, and select the overload for
+  `const char_type*` with a null pointer, which is undefined behaviour; a concrete `std::nullptr_t`
+  overload makes them ambiguous instead. For the other nine, `{}` is already ambiguous. Checked
+  with GCC 14.
 - **When.** In T8, with Q-25 and the sanitizers, unless you would rather have it in the T3 PR.
+- **Answer:** _pending_
+
+### Q-27 Checking that the deleted `nullptr` overloads are the ones chosen
+- **Context.** Codex's review of PR #17 suggested keeping, as a script, the check that every
+  container lookup called with `nullptr` or `0` names a deleted overload rather than being
+  ambiguous. The compile-time checks cannot see that difference (D-032). The check compiles each
+  call in its own translation unit and reads the diagnostic: 104 calls today. T3 ran it by hand,
+  with a throwaway script, on GCC 14, Clang 20 and Clang 20 + libc++ 20.
+- **Options:**
+  - (a) **Recommended.** A compile-fail check run by CTest, added in T8. Each call must fail to
+    compile, and its diagnostic must name a deleted function and no ambiguity. The wording differs
+    by compiler (MSVC reports C2280 and C2668), so the check carries a pattern per compiler, and
+    the CI matrix runs it. T8 is where Q-26 adds 11 deleted overloads to the view, which need the
+    same check, so the mechanism is built once.
+  - (b) The same check, added to the T3 PR now.
+  - (c) Commit the script now, under a `tools/` directory, to be run by hand. Nothing would run it,
+    so it could break unnoticed.
+  - (d) Neither: the compile-time checks, and the manual run recorded in D-032, are enough.
+- **When.** T8, unless you want it in the T3 PR.
 - **Answer:** _pending_

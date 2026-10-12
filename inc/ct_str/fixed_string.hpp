@@ -76,7 +76,8 @@ namespace cps::ct_string
         /// basic_ct_string_view of character type TChar compare: arrays of and pointers to
         /// TChar (named here because the standard does not make their conversion to
         /// std::basic_string_view noexcept, so some standard libraries do not), and anything
-        /// else that converts to std::basic_string_view<TChar> without throwing. nullptr is
+        /// else whose const lvalue converts to std::basic_string_view<TChar> without throwing
+        /// (the operators take it by const reference). nullptr is
         /// never accepted. Both class templates use this one constraint, so they cannot
         /// drift apart.
         template<typename T, typename TChar>

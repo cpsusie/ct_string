@@ -367,6 +367,19 @@ my standard library" is not the same as standard C++.
     `std::nullptr_t`. `std::hash<basic_ct_string_view>` and each of the 40 container lookups get
     a deleted `std::nullptr_t` overload. Three headers changed, by 68 lines, most of them the
     deleted declarations and their comments.
+  - **Codex's review (PR #17).** It found that the 40 concrete `std::nullptr_t` overloads also
+    rejected two valid calls: `m.contains({})`, a lookup of the empty key, and a key type that
+    converts to `std::nullptr_t` as well as to a string view. The 40 deleted overloads now deduce
+    their parameter, constrained to `std::nullptr_t` or an integer type
+    (`detail::null_or_integer`), which `{}` cannot deduce. `std::hash` keeps its concrete
+    overload, which turns `{}` from undefined behaviour into an error there (D-032, "Revised in
+    review"). Also from the review: README and LEGENDUM say that the conversion that must not
+    throw is the one from a `const` lvalue, and a compile-time check confirms that such an
+    operand compares even when its rvalue conversion is deleted. Tests first: nine new
+    container assertions failed at 32af580, and the new run-time test,
+    `CtsvEmptyBraces.LookUpTheEmptyKeyInEveryWrapper`, did not compile: 175 tests became 176.
+    The review also suggested keeping the by-hand diagnostic check as a script; Q-27 asks how,
+    and when.
   - **Tests, written first.** `tests/cxx20_comparison_checks.cpp`, in the smoke target, covers
     every operand kind in step 1, for both classes, both flavours of view and all five character
     types, in both orders, with `==`, `!=`, `<` and `<=>`. It checks `noexcept`, and that other
@@ -399,7 +412,10 @@ my standard library" is not the same as standard C++.
       Clang 20 + libc++ 20. All 175 tests pass, and the demo exits with 0;
     - each of the 40 container lookups, `const` or not, called with `nullptr` and with `0`,
       reports a deleted function, never an ambiguity, with GCC 14, Clang 20 and Clang 20 +
-      libc++ 20. The compile-time checks cannot see this difference (D-032).
+      libc++ 20. The compile-time checks cannot see this difference (D-032);
+    - after Codex's review, all of the above again, with 176 tests; and all 104 null lookups
+      (every member, on a `const` container and a non-const one, with `nullptr` and with `0`)
+      report a deleted function (D-032).
   - **Docs.** README and LEGENDUM, in parallel: "The two types at a glance" ("Duo genera
     breviter") now lists what the types compare with; "Language standard" ("Norma linguae")
     describes the smoke target's second translation unit; "Requirements" ("Quae requirantur")
@@ -482,7 +498,7 @@ runners and containers; required status checks and rulesets; Dependabot; least-p
      and the preset schema. This plan: status, and T5 in full.
 - **Definition of done.**
   - The default top-level build, with the presets and without them, still builds the smoke check,
-    the suite (175 tests, all passing) and the demo, in Debug and Release with `-Werror`, on GCC 14
+    the suite (176 tests, all passing) and the demo, in Debug and Release with `-Werror`, on GCC 14
     and on Clang 20 with libstdc++.
   - A configure with all three options off succeeds where neither fmt nor GoogleTest is installed.
     This is verified in a container that has neither, and the PR shows how.
@@ -580,6 +596,7 @@ runners and containers; required status checks and rulesets; Dependabot; least-p
     `CtSvFormatter.*` tests cannot silently vanish there (D-029, F-14).
   - `nullptr` in the view's members that mirror `std::basic_string_view`, per Q-26. (Q-24, for
     the comparators and container lookups, was done in T3: D-032.)
+  - A compile-fail check that the deleted `nullptr` overloads are the ones chosen, per Q-27.
   - The suite under AddressSanitizer and UndefinedBehaviorSanitizer, with GCC 14 and Clang 20.
   - macOS `macos-15` with AppleClang, if Q-07 is yes.
   - README and LEGENDUM rows for libc++ and macOS.
@@ -822,7 +839,7 @@ Risk IDs use K-n, to avoid clashing with the requirement IDs (R-n) in §4.
 |---|---|---|---|
 | T1 | Merged | #14 | Plan, decisions, questions, findings. You then answered Q-01, Q-06, Q-16 and Q-21. |
 | T2 | Merged | #15 | fmt tests restored, with a guard (D-029); the four answers recorded; Q-22 and Q-23 added for T3. You then refined the Latin (#16). |
-| T3 | In review | this PR | Comparisons compile with libc++ 17+ (D-030); misnamed concept fixed (D-031); no comparator, hasher or lookup takes `nullptr` (D-032, Q-24); 175 tests; Q-25 and Q-26 added for T8 |
+| T3 | In review | this PR | Comparisons compile with libc++ 17+ (D-030); misnamed concept fixed (D-031); no comparator, hasher or lookup takes `nullptr` (D-032, Q-24); 176 tests; Q-25, Q-26 and Q-27 added for T8 |
 | T4 | Next: planned in full | — | Needs Q-09 (default 3.21) |
 | T5–T21 | Planned (outline) | — | Each is detailed in the PR of the task before it |
 
@@ -855,6 +872,10 @@ Risk IDs use K-n, to avoid clashing with the requirement IDs (R-n) in §4.
     container lookups still take `nullptr` in C++20 mode (Q-24). You asked for Q-24 in T3, which
     applies it (D-032). Doing so found Q-26. Q-25 and Q-26 are needed by T8, so they block nothing
     now.
+  - Codex's review of the T3 PR found that the first form of D-032's deleted container overloads
+    also rejected `{}`, a valid lookup of the empty key. The tests checked every key that worked
+    before, but not `{}`. Lesson for T8 (Q-26) and later: when a deleted overload is added, check
+    that `{}`, and class types with more than one conversion, behave as before.
   - Planning T4 with a prototype showed that CMake 3.21 already builds the project as it is. The
     risk in T4 is the option and dependency wiring, not the version.
 - **Risks.** K-2 stays Low: the suite passed with libc++ 20 unchanged. No new risk.

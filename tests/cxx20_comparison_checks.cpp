@@ -288,13 +288,32 @@ namespace
     static_assert(rejects_throwing_conversions<basic_ct_string_view<char, false>>);
     static_assert(rejects_throwing_conversions<basic_fixed_string<char, 4>>);
 
+    // Conversely, an operand whose conversion from a const lvalue cannot throw
+    // compares, even when its conversion from an rvalue is deleted: that one is
+    // never used.
+
+    struct nothrow_only_from_const_lvalue
+    {
+        operator std::string_view() const& noexcept { return {}; } // NOLINT(*-explicit-constructor)
+        operator std::string_view() && = delete; // NOLINT(*-explicit-constructor)
+    };
+
+    static_assert(nothrow_comparable<const basic_ct_string_view<char, true>&,
+        const nothrow_only_from_const_lvalue&>);
+    static_assert(nothrow_comparable<const basic_ct_string_view<char, false>&,
+        const nothrow_only_from_const_lvalue&>);
+    static_assert(nothrow_comparable<const basic_fixed_string<char, 4>&,
+        const nothrow_only_from_const_lvalue&>);
+
     // -- comparators, hashers and container lookups never take nullptr ---------
     // They convert their keys to std::basic_string_view, which in C++20 still
     // converts from nullptr (P2166 removed that in C++23); the call then has
     // undefined behaviour. None of them accepts nullptr, or a literal 0 (a
     // common spelling of NULL), on any standard library or language version
     // (Q-24, D-032). Each check also confirms that every other key still
-    // works, so the rejection is specific to nullptr.
+    // works, so the rejection is specific to nullptr. For the containers, that
+    // includes empty braces and a key that also converts to nullptr, which the
+    // first version of D-032 rejected by mistake (Codex's review of PR #17).
 
     static_assert(!ctsv_lookup_key<std::nullptr_t, char>);
     static_assert(!ctsv_lookup_key<const std::nullptr_t, char>);
@@ -382,11 +401,36 @@ namespace
         && (!MAP || requires (C& c, const TKey& key) { c.at(key); c.at_if(key); })
         && (std::is_const_v<C> || requires (C& c, const TKey& key) { c.erase(key); });
 
+    /// Every lookup member of the container \p C takes empty braces, which make
+    /// an empty std::basic_string_view. erase does not: there, {} could equally
+    /// be an iterator, as it can for the standard containers.
+    template<typename C, bool ORDERED, bool MAP>
+    concept looks_up_with_empty_braces = requires (C& c)
+        {
+            c.find({});
+            c.contains({});
+            c.count({});
+            c.equal_range({});
+        }
+        && (!ORDERED || requires (C& c) { c.lower_bound({}); c.upper_bound({}); })
+        && (!MAP || requires (C& c) { c.at({}); c.at_if({}); });
+
+    /// A key that converts both to a std::basic_string_view and to nullptr. Only
+    /// the first conversion leads to a key, so a lookup must use it.
+    template<typename TChar>
+    struct converts_to_view_and_to_null
+    {
+        // NOLINTNEXTLINE(*-explicit-constructor)
+        operator std::basic_string_view<TChar>() const noexcept { return {}; }
+        // NOLINTNEXTLINE(*-explicit-constructor)
+        operator std::nullptr_t() const noexcept { return nullptr; }
+    };
+
     /// Some member of the container \p C takes nullptr or a literal 0 as a key.
     /// A member that \p C does not have takes nothing.
     /// This checks only that such a call does not compile. A requires-expression
     /// cannot tell a deleted overload from an ambiguous call, so it does not check
-    /// that the deleted nullptr_t overloads are the ones chosen (D-032).
+    /// that the deleted overloads are the ones chosen (D-032).
     template<typename C>
     concept some_lookup_takes_null =
         requires (C& c) { c.find(nullptr); } || requires (C& c) { c.find(0); }
@@ -399,8 +443,9 @@ namespace
         || requires (C& c) { c.at_if(nullptr); } || requires (C& c) { c.at_if(0); }
         || requires (C& c) { c.erase(nullptr); } || requires (C& c) { c.erase(0); };
 
-    /// The container \p C, const or not, looks up every key kind, and never
-    /// nullptr or a literal 0.
+    /// The container \p C, const or not, looks up every key kind, including empty
+    /// braces and a key that also converts to nullptr, and never nullptr or a
+    /// literal 0.
     template<typename C, typename TChar, bool ORDERED, bool MAP>
     concept looks_up_every_key_but_null =
         looks_up_with<C, TChar[4], ORDERED, MAP>
@@ -411,7 +456,11 @@ namespace
         && looks_up_with<C, basic_fixed_string<TChar, 4>, ORDERED, MAP>
         && looks_up_with<C, basic_ct_string_view<TChar, true>, ORDERED, MAP>
         && looks_up_with<C, basic_ct_string_view<TChar, false>, ORDERED, MAP>
+        && looks_up_with<C, converts_to_view_and_to_null<TChar>, ORDERED, MAP>
         && looks_up_with<const C, const TChar*, ORDERED, MAP>
+        && looks_up_with<const C, converts_to_view_and_to_null<TChar>, ORDERED, MAP>
+        && looks_up_with_empty_braces<C, ORDERED, MAP>
+        && looks_up_with_empty_braces<const C, ORDERED, MAP>
         && !some_lookup_takes_null<C>
         && !some_lookup_takes_null<const C>;
 

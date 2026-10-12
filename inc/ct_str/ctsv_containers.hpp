@@ -99,6 +99,19 @@ namespace cps::ct_string
                 throw std::out_of_range{std::string{what} + ": key not found"};
             }
         }
+
+        /// \brief The argument types of the deleted lookup overloads that keep
+        /// nullptr from being a key (D-032): std::nullptr_t, and every integer
+        /// type, since a literal 0 (a common spelling of NULL) converts to a
+        /// pointer too. No argument of these types was ever a valid key.
+        ///
+        /// The deleted overloads take it as a deduced parameter, not as a
+        /// concrete std::nullptr_t. Empty braces deduce nothing, so {} still
+        /// looks up an empty key; and a key type that also converts to nullptr
+        /// deduces itself, so it is not ambiguous.
+        template<typename T>
+        concept null_or_integer = std::same_as<wo_qual_t<T>, std::nullptr_t>
+            || std::integral<wo_qual_t<T>>;
     }
 
     // =====================================================================
@@ -391,26 +404,28 @@ namespace cps::ct_string
         // -- nullptr is never a key ------------------------------------------
         //
         // std_sv_type converts from nullptr in C++20 (P2166 removed that in
-        // C++23), and the lookup would then have undefined behavior. So every
-        // lookup member has a deleted std::nullptr_t overload, const-qualified
-        // like the member itself. nullptr, and a literal 0, match it better than
-        // std_sv_type, so passing either does not compile, with any standard
-        // library or language version (D-032).
-        iterator find(std::nullptr_t) = delete;
-        const_iterator find(std::nullptr_t) const = delete;
-        bool contains(std::nullptr_t) const = delete;
-        size_type count(std::nullptr_t) const = delete;
-        iterator lower_bound(std::nullptr_t) = delete;
-        const_iterator lower_bound(std::nullptr_t) const = delete;
-        iterator upper_bound(std::nullptr_t) = delete;
-        const_iterator upper_bound(std::nullptr_t) const = delete;
-        std::pair<iterator, iterator> equal_range(std::nullptr_t) = delete;
-        std::pair<const_iterator, const_iterator> equal_range(std::nullptr_t) const = delete;
-        mapped_type& at(std::nullptr_t) = delete;
-        const mapped_type& at(std::nullptr_t) const = delete;
-        mapped_type* at_if(std::nullptr_t) = delete;
-        const mapped_type* at_if(std::nullptr_t) const = delete;
-        size_type erase(std::nullptr_t) = delete;
+        // C++23), and from a literal 0 in every version, and the lookup would
+        // then have undefined behavior. So every lookup member has a deleted
+        // overload, const-qualified like the member itself, taking nullptr or
+        // an integer (detail::null_or_integer). nullptr, and a literal 0, match
+        // it better than std_sv_type, so passing either does not compile, with
+        // any standard library or language version (D-032).
+        iterator find(detail::null_or_integer auto) = delete;
+        const_iterator find(detail::null_or_integer auto) const = delete;
+        bool contains(detail::null_or_integer auto) const = delete;
+        size_type count(detail::null_or_integer auto) const = delete;
+        iterator lower_bound(detail::null_or_integer auto) = delete;
+        const_iterator lower_bound(detail::null_or_integer auto) const = delete;
+        iterator upper_bound(detail::null_or_integer auto) = delete;
+        const_iterator upper_bound(detail::null_or_integer auto) const = delete;
+        std::pair<iterator, iterator> equal_range(detail::null_or_integer auto) = delete;
+        std::pair<const_iterator, const_iterator>
+            equal_range(detail::null_or_integer auto) const = delete;
+        mapped_type& at(detail::null_or_integer auto) = delete;
+        const mapped_type& at(detail::null_or_integer auto) const = delete;
+        mapped_type* at_if(detail::null_or_integer auto) = delete;
+        const mapped_type* at_if(detail::null_or_integer auto) const = delete;
+        size_type erase(detail::null_or_integer auto) = delete;
 
         // -- interop ---------------------------------------------------------
 
@@ -572,13 +587,13 @@ namespace cps::ct_string
         }
 
         // -- nullptr is never a key (see basic_ctsv_map) ---------------------
-        iterator find(std::nullptr_t) const = delete;
-        bool contains(std::nullptr_t) const = delete;
-        size_type count(std::nullptr_t) const = delete;
-        iterator lower_bound(std::nullptr_t) const = delete;
-        iterator upper_bound(std::nullptr_t) const = delete;
-        std::pair<iterator, iterator> equal_range(std::nullptr_t) const = delete;
-        size_type erase(std::nullptr_t) = delete;
+        iterator find(detail::null_or_integer auto) const = delete;
+        bool contains(detail::null_or_integer auto) const = delete;
+        size_type count(detail::null_or_integer auto) const = delete;
+        iterator lower_bound(detail::null_or_integer auto) const = delete;
+        iterator upper_bound(detail::null_or_integer auto) const = delete;
+        std::pair<iterator, iterator> equal_range(detail::null_or_integer auto) const = delete;
+        size_type erase(detail::null_or_integer auto) = delete;
 
         /// \brief Escape hatch to the wrapped std::set.
         [[nodiscard]] base_type& base() noexcept { return *this; }
@@ -818,17 +833,18 @@ namespace cps::ct_string
         }
 
         // -- nullptr is never a key (see basic_ctsv_map) ---------------------
-        iterator find(std::nullptr_t) = delete;
-        const_iterator find(std::nullptr_t) const = delete;
-        bool contains(std::nullptr_t) const = delete;
-        size_type count(std::nullptr_t) const = delete;
-        std::pair<iterator, iterator> equal_range(std::nullptr_t) = delete;
-        std::pair<const_iterator, const_iterator> equal_range(std::nullptr_t) const = delete;
-        mapped_type& at(std::nullptr_t) = delete;
-        const mapped_type& at(std::nullptr_t) const = delete;
-        mapped_type* at_if(std::nullptr_t) = delete;
-        const mapped_type* at_if(std::nullptr_t) const = delete;
-        size_type erase(std::nullptr_t) = delete;
+        iterator find(detail::null_or_integer auto) = delete;
+        const_iterator find(detail::null_or_integer auto) const = delete;
+        bool contains(detail::null_or_integer auto) const = delete;
+        size_type count(detail::null_or_integer auto) const = delete;
+        std::pair<iterator, iterator> equal_range(detail::null_or_integer auto) = delete;
+        std::pair<const_iterator, const_iterator>
+            equal_range(detail::null_or_integer auto) const = delete;
+        mapped_type& at(detail::null_or_integer auto) = delete;
+        const mapped_type& at(detail::null_or_integer auto) const = delete;
+        mapped_type* at_if(detail::null_or_integer auto) = delete;
+        const mapped_type* at_if(detail::null_or_integer auto) const = delete;
+        size_type erase(detail::null_or_integer auto) = delete;
 
         /// \brief Escape hatch to the wrapped std::unordered_map.
         [[nodiscard]] base_type& base() noexcept { return *this; }
@@ -987,13 +1003,14 @@ namespace cps::ct_string
         }
 
         // -- nullptr is never a key (see basic_ctsv_map) ---------------------
-        iterator find(std::nullptr_t) = delete;
-        const_iterator find(std::nullptr_t) const = delete;
-        bool contains(std::nullptr_t) const = delete;
-        size_type count(std::nullptr_t) const = delete;
-        std::pair<iterator, iterator> equal_range(std::nullptr_t) = delete;
-        std::pair<const_iterator, const_iterator> equal_range(std::nullptr_t) const = delete;
-        size_type erase(std::nullptr_t) = delete;
+        iterator find(detail::null_or_integer auto) = delete;
+        const_iterator find(detail::null_or_integer auto) const = delete;
+        bool contains(detail::null_or_integer auto) const = delete;
+        size_type count(detail::null_or_integer auto) const = delete;
+        std::pair<iterator, iterator> equal_range(detail::null_or_integer auto) = delete;
+        std::pair<const_iterator, const_iterator>
+            equal_range(detail::null_or_integer auto) const = delete;
+        size_type erase(detail::null_or_integer auto) = delete;
 
         /// \brief Escape hatch to the wrapped std::unordered_set.
         [[nodiscard]] base_type& base() noexcept { return *this; }

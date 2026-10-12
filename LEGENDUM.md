@@ -142,7 +142,7 @@ Utrumque genus cum altero confertur, cuiusvis speciei et magnitudinis, atque cum
 
 - cum litteralibus, et cum areis vel indicibus sui generis characterum, sive `const` sive non; quae usque ad primum characterem nullum leguntur;
 - cum `std::basic_string` et `std::basic_string_view` eiusdem generis characterum;
-- cum quavis alia re quae in `std::basic_string_view` eius generis characterum sine exceptione convertitur.
+- cum quavis alia re quae, per referentiam `const` lecta, in `std::basic_string_view` eius generis characterum sine exceptione convertitur; sic enim quaeque comparatio eam legit.
 
 Altera pars utrimque poni potest; `==`, `!=`, `<`, `<=`, `>`, `>=`, `<=>` omnia valent. Omnes hae comparationes `noexcept` sunt, quacumque bibliotheca standard utaris. Chordae alterius generis characterum, atque `nullptr`, compositionis tempore recusantur. Ut in `std::basic_string_view`, index `nullptr` esse non debet, et area vel index nullo charactere terminari debet.
 

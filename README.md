@@ -181,7 +181,8 @@ size, and with:
   `const` or not. These are read up to their first null character;
 - `std::basic_string` and `std::basic_string_view` of the same character type;
 - anything else that converts to `std::basic_string_view` of that character
-  type without throwing.
+  type without throwing when it is read through a `const` reference, as every
+  comparison reads it.
 
 The other operand may be on either side, and `==`, `!=`, `<`, `<=`, `>`, `>=`
 and `<=>` all work. Every one of these comparisons is `noexcept`, whichever
