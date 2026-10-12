@@ -414,9 +414,18 @@ reused, so they may appear out of numeric order.
     also caught `{}` and keys that convert to `std::nullptr_t` as well (see "Revised in review").
   - Keeping the concrete twins and documenting the break: the extra calls they reject had no
     undefined behaviour, so the break would buy nothing.
-- **Not covered:** the view's members that mirror `std::basic_string_view`: `compare`,
-  `starts_with`, `ends_with`, `contains`, `find` and the other searches. Like the standard's, they
-  take `nullptr` in every language version, through their overloads for `const char_type*` (Q-26).
+- **Not covered:**
+  - the view's members that mirror `std::basic_string_view`: `compare`, `starts_with`,
+    `ends_with`, `contains`, `find` and the other searches. Like the standard's, they take
+    `nullptr` in every language version, through their overloads for `const char_type*` (Q-26).
+  - braced lists, as in `m.find({nullptr})` or `m.find({0})`. They build the `std_sv_type`
+    argument in place, as `std::string_view{nullptr}` would; C++20 allows that, and C++23 rejects
+    it. The first version caught them by accident, since `{nullptr}` also initialises
+    `std::nullptr_t`; the deduced twins do not. On the T3 base they compiled, so nothing regresses.
+    Catching them would take a second deleted twin per lookup, taking a one-element array
+    (`const T (&)[1]`, which `{}` cannot deduce): 40 more declarations, for a spelling as deliberate
+    as `std::string_view{nullptr}`, which no overload can catch. Copilot's own review of the
+    revision found this; the PR asks you to confirm leaving it out.
 
 ---
 

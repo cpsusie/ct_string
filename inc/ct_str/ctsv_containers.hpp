@@ -403,13 +403,15 @@ namespace cps::ct_string
 
         // -- nullptr is never a key ------------------------------------------
         //
-        // std_sv_type converts from nullptr in C++20 (P2166 removed that in
-        // C++23), and from a literal 0 in every version, and the lookup would
-        // then have undefined behavior. So every lookup member has a deleted
-        // overload, const-qualified like the member itself, taking nullptr or
-        // an integer (detail::null_or_integer). nullptr, and a literal 0, match
-        // it better than std_sv_type, so passing either does not compile, with
-        // any standard library or language version (D-032).
+        // In C++20, std_sv_type converts from nullptr and from a literal 0 (P2166
+        // made both ill-formed in C++23), and the lookup would then have
+        // undefined behavior. So every lookup member has a deleted overload,
+        // const-qualified like the member itself, taking nullptr or an integer
+        // (detail::null_or_integer). nullptr, and a literal 0, match it better
+        // than std_sv_type, so passing either does not compile, with any
+        // standard library or language version (D-032). A braced list, as in
+        // find({nullptr}), is not caught: it builds the std_sv_type in place, as
+        // std_sv_type{nullptr} would, which C++20 allows.
         iterator find(detail::null_or_integer auto) = delete;
         const_iterator find(detail::null_or_integer auto) const = delete;
         bool contains(detail::null_or_integer auto) const = delete;
