@@ -1012,30 +1012,39 @@ implicit conversion to std string    explicit (allocates)
 ## Building & integrating
 
 The library is header-only. Including its headers manually requires C++20 and
-no mandatory third-party library. The current CMake build always includes the
-tests and demo, even when used as a subproject, and requires CMake 4.0.2 or
-later, fmt, GoogleTest, and a C++23-capable toolchain.
+no third-party library. The CMake project requires CMake 3.21 or later. Only
+when it is the top-level project does it also build the C++20 checks, the
+C++23 tests and the demo ([build options](#build-options)). Included in
+another project, with `FetchContent` or `add_subdirectory`, it provides the
+library alone, and needs neither fmt nor GoogleTest.
 
 ### CMake (FetchContent)
 
 ```cmake
 include(FetchContent)
 FetchContent_Declare(
-    cstr_view
+    ct_string
     GIT_REPOSITORY https://github.com/cpsusie/ct_string.git
-    GIT_TAG        main
+    GIT_TAG        develop-release_1
 )
-FetchContent_MakeAvailable(cstr_view)
+FetchContent_MakeAvailable(ct_string)
 
-target_link_libraries(my_target PRIVATE cstr_view)
+target_link_libraries(my_target PRIVATE ct_string::ct_string)
 ```
+
+Until the first release, the CMake project described here exists only on the
+`develop-release_1` branch. Once a release is tagged, set `GIT_TAG` to that
+tag.
 
 ### CMake (subdirectory)
 
 ```cmake
-add_subdirectory(third_party/cstr_view)
-target_link_libraries(my_target PRIVATE cstr_view)
+add_subdirectory(third_party/ct_string)
+target_link_libraries(my_target PRIVATE ct_string::ct_string)
 ```
+
+The target was formerly named `cstr_view`. That name still works: it is an
+alias of `ct_string::ct_string`.
 
 ### Manual
 
@@ -1050,6 +1059,57 @@ and enables a `fmt::formatter` specialization for `basic_ct_string_view`
 automatically. Include order does not matter, and no extra macro is
 required from the user.
 
+### Build options
+
+Each option is `ON` when this is the top-level project, and `OFF` when it is
+included in another. Either way, `-D` overrides it.
+
+| Option | Builds | Requires |
+|---|---|---|
+| `CT_STRING_BUILD_CXX20_CHECKS` | `cstr_view_cxx20_smoke`, the C++20 checks ([below](#language-standard-library-vs-tests)) | C++20; uses fmt if CMake finds it |
+| `CT_STRING_BUILD_TESTS` | `cstr_view_tests`, the test suite | C++23, GoogleTest and fmt |
+| `CT_STRING_BUILD_EXAMPLES` | `test_console_app`, the demo | C++23 and fmt |
+
+fmt and GoogleTest are looked up only for the options that need them. To check
+a compiler that has no C++23, such as GCC 11, build the C++20 checks alone:
+
+```bash
+cmake -S . -B build -DCT_STRING_BUILD_TESTS=OFF -DCT_STRING_BUILD_EXAMPLES=OFF
+cmake --build build
+```
+
+The C++20 checks then build without fmt if fmt is not installed. If it is
+installed, the header finds it on its own (see above), whether CMake links it
+or not.
+
+The project uses no C++ modules. It turns off CMake's module scanning (CMake
+3.28 and later) for its own targets, so Clang does not need `clang-scan-deps`.
+
+### CMake presets
+
+`CMakePresets.json` defines configure, build and test presets with the same
+names. Each uses Ninja and builds in `build/<preset>`:
+
+| Presets | Compiler | Host |
+|---|---|---|
+| `gcc-debug`, `gcc-release` | `g++` | any but Windows |
+| `clang-debug`, `clang-release` | `clang++` | any but Windows |
+| `msvc-debug`, `msvc-release` | `cl` | Windows, x64 developer environment |
+| `clang-cl-debug`, `clang-cl-release` | `clang-cl` | Windows, x64 developer environment |
+
+```bash
+cmake --preset gcc-debug
+cmake --build --preset gcc-debug
+ctest --preset gcc-debug
+```
+
+To use a particular compiler version, override the compiler when configuring:
+`cmake --preset gcc-debug -D CMAKE_CXX_COMPILER=g++-14`. Run the MSVC and
+clang-cl presets from an x64 Developer Command Prompt or Developer PowerShell;
+Visual Studio sets that environment up itself. A test preset fails if no test
+was built. The presets need only CMake 3.21. Personal presets belong in
+`CMakeUserPresets.json`, which Git ignores.
+
 ### Running the tests
 
 ```bash
@@ -1058,20 +1118,23 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-GoogleTest is used and is located via `find_package(GTest CONFIG REQUIRED)`.
+When the tests are enabled, GoogleTest is located with
+`find_package(GTest CONFIG REQUIRED)`, and fmt with
+`find_package(fmt CONFIG REQUIRED)`.
 
 ### Language standard: library vs. tests
 
-The **library is C++20**, and the `cstr_view` interface target advertises that
-floor with `target_compile_features(cstr_view INTERFACE cxx_std_20)`. The
+The **library is C++20**, and the `ct_string` interface target advertises that
+floor with `target_compile_features(ct_string INTERFACE cxx_std_20)`. The
 **tests and the demo console app are C++23** (the console app uses
 `std::expected`); they request it per-target with
 `target_compile_features(... PRIVATE cxx_std_23)` rather than by raising
 `CMAKE_CXX_STANDARD` for the rest of the build.
 
 To keep those two facts from drifting apart, the build includes a
-`cstr_view_cxx20_smoke` static library, **pinned** to C++20 via target
-properties. One translation unit
+`cstr_view_cxx20_smoke` static library (option
+`CT_STRING_BUILD_CXX20_CHECKS`), **pinned** to C++20 via target properties.
+It needs neither GoogleTest nor a C++23 compiler. One translation unit
 ([`tests/cxx20_header_smoke.cpp`](tests/cxx20_header_smoke.cpp)) includes
 every public header and instantiates the templates. A second
 ([`tests/cxx20_comparison_checks.cpp`](tests/cxx20_comparison_checks.cpp)) is
@@ -1097,6 +1160,8 @@ downstream users on older toolchains.
   predates `std::ranges::to` (P1206R7), so nothing in the library -- or in the
   tests -- may depend on it.
 - Tested with and without `fmtlib`.
+- CMake 3.21 or later, to use the CMake project. Including the headers manually
+  needs no CMake.
 - Besides libstdc++ and the MSVC STL, **libc++ 17 or later** works. This was
   verified locally on Linux/x86_64, with Clang 17 + libc++ 17 and with
   Clang 20 + libc++ 20, where the C++23 tests pass too. CI does not check

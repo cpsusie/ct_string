@@ -229,7 +229,7 @@ reused, so they may appear out of numeric order.
 ## Library design
 
 ### D-030 The comparison operators name arrays and pointers of their own character type, and never accept `nullptr`
-- **Date:** 2026-10-11. **Status:** Proposed. **Related:** T3, F-5, D-024, Q-22, Q-24.
+- **Date:** 2026-10-11. **Status:** Accepted (T3, PR #17). **Related:** T3, F-5, D-024, Q-22, Q-24.
 - **Context:**
   - Four operator templates, `operator==` and `operator<=>` in `basic_ct_string_view` and in
     `basic_fixed_string`, accepted an operand only if it was nothrow-convertible to the string
@@ -292,7 +292,7 @@ reused, so they may appear out of numeric order.
   (Q-24). D-032, also in T3, makes them reject it.
 
 ### D-031 Public concepts next to `nothrow_convertible_to`: fix the misnamed one, keep all four
-- **Date:** 2026-10-11. **Status:** Proposed. **Related:** T3, Q-23.
+- **Date:** 2026-10-11. **Status:** Accepted (T3, PR #17). **Related:** T3, Q-23.
 - **Context:** `fixed_string.hpp` defines four public concepts that nothing in the library, the
   tests or the demo used. One, `not_exact_same_nothrow_convertible_to`, did not check `noexcept`,
   despite its name.
@@ -310,8 +310,8 @@ reused, so they may appear out of numeric order.
 - **Alternatives:** remove all four before 1.0 (Q-23 b); leave them as they are (Q-23 c).
 
 ### D-032 No comparator, hasher or container lookup accepts `nullptr`
-- **Date:** 2026-10-11; revised 2026-10-12 after Codex's review of PR #17. **Status:** Proposed.
-  **Related:** T3, Q-24, Q-26, D-030, F-14.
+- **Date:** 2026-10-11; revised 2026-10-12 after Codex's review of PR #17. **Status:** Accepted
+  (T3, PR #17). **Related:** T3, Q-24, Q-26, D-030, F-14.
 - **Context:**
   - D-030 makes the four comparison operators reject `nullptr`. The rest of the library's
     comparison and lookup code takes, or converts to, `std::basic_string_view`. In C++20,
@@ -590,22 +590,28 @@ reused, so they may appear out of numeric order.
 ## Build system and packaging
 
 ### D-017 CMake stays the only build system, with a lower minimum version
-- **Date:** 2026-10-10. **Status:** Pending Q-09. **Related:** T4, F-6.
-- **Decision (default):**
+- **Date:** 2026-10-10; answered and applied 2026-10-18. **Status:** Accepted: Q-09 answered with
+  the recommended minimum on 2026-10-18. **Related:** T4, T6, F-6, F-15, D-033.
+- **Decision:**
   - Replace `cmake_minimum_required(VERSION 4.0.2)` with a version range: minimum 3.21, maximum the
-    newest 4.x version tested in CI.
-  - Turn off C++ module scanning for the project's targets.
-  - CI tests both the minimum and the newest CMake.
+    newest 4.x version tested. T4 sets `3.21...4.4`: 4.4.4 is the newest CMake on PyPI, and T4
+    tested it.
+  - Turn off C++ module scanning for the project's targets (`CMAKE_CXX_SCAN_FOR_MODULES OFF`,
+    which CMake versions before 3.28 ignore).
+  - CI tests both the minimum and the newest CMake (T6). When a newer CMake is tested, the
+    maximum moves up with it.
 - **Why:**
   - 3.21 is the first version with `PROJECT_IS_TOP_LEVEL`.
   - It still lets Ubuntu 22.04's stock CMake (3.22) build the project. That system's GCC 11.4 is
     exactly the "GCC 11.3+" user the brief describes.
   - No CMake 4 feature is used.
-  - Module scanning broke the Clang 19 build (F-6).
+  - Module scanning broke the Clang 19 build (F-6). T4 found where: while configuring, in
+    GoogleTest's search for threads (F-15).
 - **Alternative:** Minimum 3.23, to install headers with `FILE_SET`. That drops stock Ubuntu 22.04.
 
 ### D-018 Tests, demo and their dependencies are optional
-- **Date:** 2026-10-10. **Status:** Accepted (T1, PR #14). **Related:** T4, T10.
+- **Date:** 2026-10-10. **Status:** Accepted (T1, PR #14); applied in T4 (D-033). **Related:** T4,
+  T10.
 - **Decision:**
   - New CMake options build the C++20 smoke check, the C++23 suite and the demo. They default to ON
     only when this is the top-level project, so your current workflow is unchanged.
@@ -629,6 +635,70 @@ reused, so they may appear out of numeric order.
     same file and target names.
   - Every consumption route (`find_package`, `FetchContent`, vcpkg, Conan) ends up with the same
     target name.
+- **Progress:** T4 renamed the project and the INTERFACE target to `ct_string`, and added the
+  aliases `ct_string::ct_string` and `cstr_view`. `add_subdirectory` and `FetchContent` users
+  already link `ct_string::ct_string`. The install rules, the package files and the version header
+  come in T9.
+
+### D-033 The CMake options, their defaults, and when fmt and GoogleTest are looked up
+- **Date:** 2026-10-18. **Status:** Proposed. **Related:** T4, T10, T11, D-018, D-029, F-7, Q-01,
+  Q-15.
+- **Decision:**
+  - Three options:
+    - `CT_STRING_BUILD_CXX20_CHECKS` builds the C++20 smoke check (D-005);
+    - `CT_STRING_BUILD_TESTS` builds the C++23 suite and registers it with CTest;
+    - `CT_STRING_BUILD_EXAMPLES` builds the demo.
+  - Each defaults to `PROJECT_IS_TOP_LEVEL`. A consumer can still turn any of them on.
+  - fmt is required (`find_package(fmt CONFIG REQUIRED)`) when the suite or the demo is enabled.
+    When only the C++20 checks are, it is looked up quietly; the smoke check links
+    `fmt::fmt-header-only` if fmt is found, and a status message says which. GoogleTest is looked
+    up only when the suite is enabled. The suite keeps D-029's expectation that fmt is there.
+  - With all three options off, the project defines the library and its aliases, then stops
+    (`return()`). It looks nothing up, defines no other target, and does not call
+    `enable_testing()`. T9 puts the install rules before that point.
+- **Why:**
+  - These are D-018's options. The prefix is Q-01's answer. `EXAMPLES`, not `DEMO`, is the name
+    Q-15 already uses, so T10 needs no rename when the demo moves to `examples/`.
+  - `PROJECT_IS_TOP_LEVEL` keeps your own workflow unchanged, and gives consumers only the
+    library.
+  - Stopping early is the simplest way to guarantee that a consumer's build never meets the
+    project's warnings target, its dependencies or its tests.
+  - Until T11, fmt support in the header depends only on whether `<fmt/format.h>` can be found
+    (F-7). Linking fmt to the smoke check only when CMake finds it keeps that check buildable on a
+    system without fmt, such as the GCC 11.1 container.
+- **Alternatives:**
+  - One option for the suite and the demo together. That would not allow the C++23 suite to be
+    skipped while keeping the demo, or the other way round, and T10 would split it again.
+  - Options that default to OFF everywhere. Your own builds would then need flags to keep doing
+    what they do today.
+
+### D-034 CMake presets: schema 3, four compilers, Debug and Release
+- **Date:** 2026-10-18. **Status:** Proposed. **Related:** T4, T5–T7, D-017, Q-09.
+- **Decision:**
+  - `CMakePresets.json` uses preset schema version 3, the newest that CMake 3.21 reads.
+  - Eight configure presets: `gcc`, `clang`, `msvc` and `clang-cl`, each `-debug` and
+    `-release`. Build and test presets have the same names.
+  - All use Ninja and build in `build/<preset>`. Test presets show the output of failing tests,
+    and fail if no test was found.
+  - The compiler is named without a version (`g++`, `clang++`, `cl`, `clang-cl`). CI and users
+    pick a version with `-D CMAKE_CXX_COMPILER=...`, which overrides the preset.
+  - The GCC and Clang presets are offered on every host except Windows; the MSVC and clang-cl
+    presets only on Windows, where they expect an x64 developer environment (Visual Studio, or a
+    Developer Command Prompt).
+  - Personal presets go in `CMakeUserPresets.json`, already ignored by Git.
+- **Why:**
+  - Schema 3 lets the minimum-CMake jobs in T6 use the same presets. Nothing in a later schema is
+    needed. Q-09's recommendation had said presets might need CMake 3.25; with schema 3 they do
+    not.
+  - Ninja is on every GitHub-hosted runner, and in Visual Studio, and builds in parallel by
+    default.
+  - One preset per compiler, not per compiler version, keeps the file short; the CI matrix
+    supplies versions.
+  - Failing on "no tests" catches a test job that silently builds nothing.
+- **Alternatives:**
+  - Schema 6 or later, for workflow presets (CMake 3.25+). The minimum-CMake jobs could not use
+    it.
+  - One preset per compiler version. The file would grow with every CI change.
 
 ### D-020 fmt integration becomes explicit and deterministic, with today's default kept
 - **Date:** 2026-10-10. **Status:** Pending Q-10. **Related:** T11, F-7.

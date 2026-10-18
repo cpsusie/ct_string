@@ -14,7 +14,9 @@ questions.
   T3 started, and to Q-24, given in its review, are recorded in the T3 PR.
 - **New in T3:** Q-24, Q-25 and Q-26. Q-24 and Q-25 were found while verifying T3; you answered
   Q-24 in the T3 PR, and T3 applies it. Q-26 was found while applying Q-24. Q-25 and Q-26 are needed
-  by T8. Of the older questions, Q-09 is the next one needed (by T4).
+  by T8.
+- **In T4:** you answered Q-09 when T4 started; T4 applies it (D-017). The next questions needed
+  are Q-14, by T5, and then Q-04, Q-05, Q-17 and Q-18, by T6.
 
 ## Summary
 
@@ -28,7 +30,7 @@ questions.
 | Q-06 | MSVC toolsets to test | T7 | Every toolset from 14.29 (VS 2019 16.11) to the newest, on every PR; you decide before any is dropped | **Answered:** default |
 | Q-07 | macOS / AppleClang | T8 | Yes: after the libc++ fix, add a macOS arm64 job | Open |
 | Q-08 | Meaning of "separate test-suite packages" | T10 | In-repo vcpkg manifest and Conan recipe for the test suite; not published to the registries | Open |
-| Q-09 | CMake minimum | T4 | 3.21 minimum, newest tested 4.x as the policy maximum | Open |
+| Q-09 | CMake minimum | T4 | 3.21 minimum, newest tested 4.x as the policy maximum | **Answered:** default (D-017) |
 | Q-10 | fmt opt-in/opt-out | T11 | Keep auto-detection by default; add a force on/off switch; package managers default to off | Open |
 | Q-11 | Release and branch flow | T15 | You promote `develop-release_1` into `main` (merge commit) and push tag `vX.Y.Z` there → workflow publishes; pre-release tags go on `develop-release_1` | Open |
 | Q-12 | Who submits to vcpkg and ConanCenter | T19 | You, using files and steps Copilot prepares | Open |
@@ -170,7 +172,10 @@ questions.
 - **Recommendation:** Minimum **3.21** (needed for `PROJECT_IS_TOP_LEVEL`), with the newest tested
   4.x as the policy maximum. CMake presets for development may require a newer CMake (≥ 3.25),
   which does not affect consumers.
-- **Answer:** _pending_
+- **Answer (2026-10-18, when T4 started):** the recommendation is accepted: "I am fine with your
+  suggested cmake min version (you suggested 3.21, I think)." T4 applies it as `3.21...4.4`
+  (D-017). The presets turned out not to need a newer CMake: they use a schema that CMake 3.21
+  reads (D-034).
 
 ### Q-10 fmt opt-in and opt-out
 - **Context.** If fmt is anywhere on the include path, the header includes it, and there is no
@@ -232,12 +237,17 @@ questions.
   - `static_assert`s (`main.cpp` lines 291–316);
   - runtime `assert`s, active only in builds without `NDEBUG` (lines 273–276);
   - a non-zero exit code on failure (lines 325 and 333).
+  - It needs the `en_US.UTF-8` locale. Where that locale is not installed, as in a plain
+    `ubuntu:24.04` container, it stops at once with exit code 255 (F-15). T5's CI jobs install the
+    locale. This question does not change that.
+  - Since T4, it has its own option, `CT_STRING_BUILD_EXAMPLES`, separate from the suite's
+    (D-033).
 - **Options:**
   - (a) Move it to `examples/console_app/`, build it when `CT_STRING_BUILD_EXAMPLES` is on, and have
     the C++23 CI jobs build **and run** it, including a Debug build so its `assert`s are active.
     *(Recommended.)*
   - (b) As (a), but also move its checks into the test suite, so they run wherever the suite runs.
-  - (c) Keep it where it is, built together with the tests.
+  - (c) Keep it where it is, behind the option T4 added.
   - (d) Remove it. Its checks would be lost unless they move into the suite first.
 - **Answer:** _pending_
 
