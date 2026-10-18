@@ -4,8 +4,8 @@ Bibliotheca parva C++20, quae solis capitibus constat, duo genera inter se coniu
 
 | Genus | Caput | Quid sit |
 |---|---|---|
-| `cps::ct_string::basic_fixed_string<TChar, N>` | `<ct_str/fixed_string.hpp>` | Area characterum certae capacitatis, nullo charactere terminata, quae pro argumento formae non generis (NTTP) adhiberi potest. |
-| `cps::ct_string::basic_ct_string_view<TChar, VALID_CSTR>` | `<ct_str/ct_string_view.hpp>` | Prospectus non possidens, cuius characteres **compositionis tempore constantes atque per totum programma mansuri** esse ex ipso genere certo constat; si `VALID_CSTR == true`, nullo quoque charactere rite terminantur. API C tradi tuto potest; pendere ex re iam deleta non potest. |
+| `cps::ct_string::basic_fixed_string<TChar, N>` | `<ct_str/fixed_string.hpp>` | Area characterum certae capacitatis, nullo charactere terminata, quae pro argumento formae quod valorem, non genus, repraesentat (NTTP) adhiberi potest. |
+| `cps::ct_string::basic_ct_string_view<TChar, VALID_CSTR>` | `<ct_str/ct_string_view.hpp>` | Prospectus non possidens, cuius characteres **compositionis tempore constantes atque per totum programma mansuri** esse ex ipso genere certo constat; si `VALID_CSTR == true`, nullo quoque charactere rite terminantur. Si haec terminatio constat, API C tradi tuto potest; pendere ex re iam deleta non potest. |
 
 Si tale quid scribere voluisti,
 
@@ -48,11 +48,11 @@ Una res praecipue hac bibliotheca praestatur:
 
 > **Qui `basic_ct_string_view` tenet, scit characteres ad quos is spectat compositionis tempore constantes esse atque memoriam per totum programma manentem habere.** Si autem species `VALID_CSTR == true` adhibetur, constat eos etiam nullo charactere rite terminari.
 
-Obici potest nihil novi effici: `std::string_view` ad litterale dirigi posse, `std::string` autem possideri. Ita est; neutrum tamen **conditionem in ipso genere exprimit**. In eo tota causa posita est.
+Obici potest nihil novi effici: `std::string_view` ad litterale dirigi posse, `std::string` autem chordam possidere. Ita est; neutrum tamen **conditionem in ipso genere exprimit**. In eo tota causa posita est.
 
-- **`std::string_view` fide consuetudinis nititur.** Nihil impedit quominus temporario `std::string`, areae in pila positae, aut parti nullo charactere terminatae alligetur. Condicio igitur commentario committitur; commentarius, si violetur, compositionem non prohibet.
+- **`std::string_view` fide consuetudinis nititur.** Nihil impedit quominus temporario `std::string`, areae in pila positae, aut parti nullo charactere non terminatae alligetur. Condicio igitur commentario committitur; commentarius, si violetur, compositionem non prohibet.
 - **`std::string` conditionem tempore executionis emit.** Possessionem terminationemque praestat; sed exemplari facto et plerumque memoria adsignata. Quod in re immutabili atque ante executionem nota supervacuum est.
-- **`basic_ct_string_view` conditionem compositione cogit.** Publice ex se ipso vel ex altera specie copiatur aut movetur; aliter per viam `consteval`, quae `basic_fixed_string` NTTP accipit, efficitur. Ex data executionis tempore orta confingi non potest; itaque quocumque transfertur, eadem fides manet.
+- **`basic_ct_string_view` conditionem compositione cogit.** Praeter constructionem vacuam, publice ex se ipso vel ex altera specie copiatur aut movetur; aliter per viam `consteval`, quae `basic_fixed_string` NTTP accipit, efficitur. Ex datis tempore executionis ortis confingi non potest; itaque quocumque transfertur, eadem fides manet.
 
 Si igitur membrum cuiusdam generis non quamlibet chordam sed solam constantem compositionis tempore continere debet — nuntium erroris, nomen imperii, clavem descriptam, genus inscriptionis — id iam non commentario, sed genere dicitur:
 
@@ -83,7 +83,7 @@ Alternativa sic comparantur:
 | `std::string` | non | ita | **ita** | executione |
 | `ct_cstring_view` | **non** | **ita** | **non** | **compositione** |
 
-Haec fides etiam transit nec quidquam executionis tempore constat. Prospectus duorum verborum est et simpliciter copiari potest; reddi, in receptaculis condi, inter fila transmitti, API C per `c_str()` tradi potest: nullo examine, nullo exemplari, nulla memoria adsignata; condicio tamen casu violari non potest.
+Haec fides etiam transit nec quidquam executionis tempore constat. Prospectus duorum verborum est et proprietatem `trivially copyable` habet; reddi, in receptaculis condi, inter fila transmitti, API C per `c_str()` tradi potest: nullo examine, nullo exemplari, nulla memoria adsignata; condicio tamen casu violari non potest.
 
 ---
 
@@ -91,7 +91,7 @@ Haec fides etiam transit nec quidquam executionis tempore constat. Prospectus du
 
 `std::string_view` ad chordas tantum legendas egregium est; duo tamen vitia in usu graviora habet.
 
-1. **Terminationem nullo charactere non promittit.** Pars maioris chordae esse potest. Si `const char*` API C — POSIX, Win32, OpenSSL, SQLite, libcurl, `fopen` — tradendus est, ex eo directe sumi non potest; prius in `std::string` copiandum.
+1. **Terminationem nullo charactere non promittit.** Pars maioris chordae esse potest. Si `const char*` API C — POSIX, Win32, OpenSSL, SQLite, libcurl, `fopen` — tradendus est, index quidem per `data()` sumi potest; terminatio ex solo genere non constat. Nisi ea aliunde certa est, chorda prius in `std::string` copianda est.
 
 2. **Pendere potest.** Temporario `std::string` alligari atque eo deleto superesse potest. Quaedam talia instrumentum compositionis deprehendit; multa, non.
 
@@ -99,7 +99,7 @@ Haec fides etiam transit nec quidquam executionis tempore constat. Prospectus du
 
 1. Species `VALID_CSTR == true`, quae etiam **`known_cstr`** dicitur, `c_str()` praebet; inde `const TChar*` revera nullo charactere terminatus redditur. Nec exemplar, nec memoria, nec `strlen`.
 
-2. Omnis `basic_ct_string_view` aut ex data compositionis tempore (`basic_fixed_string` NTTP aut fabrica propria), aut ex alio `basic_ct_string_view`, efficitur. Characteres igitur semper per totum programma manent; prospectus pendere non potest.
+2. Omnis `basic_ct_string_view` aut ex datis tempore compositionis notis (`basic_fixed_string` NTTP aut fabrica propria), aut ex alio `basic_ct_string_view`, efficitur. Characteres igitur semper per totum programma manent; prospectus pendere non potest.
 
 `basic_fixed_string`, quo haec memoria continetur, alterum quoque usum habet: litterale pro argumento formae tradi potest.
 
@@ -107,16 +107,16 @@ Haec fides etiam transit nec quidquam executionis tempore constat. Prospectus du
 
 ## Quae praebeantur
 
-Quod quaeque tabula afferat:
+Quid quodque caput afferat:
 
 | Caput | Quid praebeat | Quorsum prosit |
 |---|---|---|
-| `<ct_str/fixed_string.hpp>` | `basic_fixed_string<TChar, N>`: area structuralis, NTTP apta, nullo charactere terminata; concatenatio `consteval` (`operator+`), litterale `_fs`, interface plena ad legendum. | Chordae ut argumenta formarum; compositio et probatio tempore compositionis per `static_assert`. Vide [usum III](#usus-iii-chorda-ut-argumentum-formae-non-generis). |
+| `<ct_str/fixed_string.hpp>` | `basic_fixed_string<TChar, N>`: area structuralis, NTTP apta, nullo charactere terminata; concatenatio `consteval` (`operator+`), litterale `_fs`, omnes operationes ad chordas legendas. | Chordae ut argumenta formarum; compositio et probatio tempore compositionis per `static_assert`. Vide [usum III](#usus-iii-chorda-ut-argumentum-formae-non-generis). |
 | `<ct_str/ct_string_view.hpp>` | Utraque species `basic_ct_string_view<TChar, VALID_CSTR>`, `_ctsv`, `make_ctsv`, `basic_ct_sv_factory`, specialitates `std::formatter` et, si adsit, `fmt::formatter`, `std::hash`, atque `std::ranges::enable_borrowed_range`. | `string_view` quod pendere non potest; cuius origo compositionis tempore constat; cui, si `known_cstr`, `c_str()` certum est. |
 | `<ct_str/char_fold.hpp>` | Conversio casus ASCII `constexpr`, sine memoria: `ascii_to_lower`, `ascii_to_upper`, atque prospectus pigri `views::ascii_lower`, `views::ascii_upper`. | Comparatio casus neglegens, projectiones, algoritmi; nulla memoria. |
-| `<ct_str/ctsv_comparators.hpp>` | Comparatores et hashes transparents, `noexcept`, `constexpr` apti: `ctsv_less`, `ctsv_equal_to`, `ctsv_three_way`, `ctsv_hash`, cum speciebus `_ci_`; item conceptus quibus exiguntur. | Comparatio heterogenea inter `basic_ct_string_view`, `std::basic_string_view`, `basic_fixed_string`, `std::basic_string`, litteralia; hash `constexpr`, quod `std::hash` non praebet. |
+| `<ct_str/ctsv_comparators.hpp>` | Comparatores et functiones hash transparentes ad usum `constexpr`; `noexcept` a conversionibus argumentorum pendet: `ctsv_less`, `ctsv_equal_to`, `ctsv_three_way`, `ctsv_hash`, cum speciebus `_ci_`; item conceptus quibus exiguntur. | Comparatio heterogenea inter `basic_ct_string_view`, `std::basic_string_view`, `basic_fixed_string`, `std::basic_string`, litteralia; hash `constexpr`, quod `std::hash` non praebet. |
 | `<ct_str/ctsv_containers.hpp>` | Involucra `map`, `set`, `unordered_map`, `unordered_set` clavibus `basic_ct_string_view`; insertio stricte distinguitur ab inquisitione; additur `at_if` non iaciens. | Claves receptaculum certo superant, sed quavis re chordae simili quaeri possunt, etiam per `at` et `erase`. |
-| `<ct_str/ctsv_format_registration.hpp>` | Formae optativae quae `operator<<` efficiunt iis generibus quae `std::format` aut `fmt::format` formari possunt, sed rivo inseri nondum possunt. | Una specialitate `formatter` scripta, etiam iostreams habentur; alter `operator<<` scribendus non est. |
+| `<ct_str/ctsv_format_registration.hpp>` | Formae optativae quae `operator<<` efficiunt iis generibus quae per `std::format` aut `fmt::format` formari possunt, sed rivo inseri nondum possunt. | Una specialitate `formatter` scripta, etiam iostreams habentur; alter `operator<<` scribendus non est. |
 
 ---
 
@@ -138,13 +138,13 @@ static_assert(ctsv == fs);              // either order; also !=, <, <=>, ...
 static_assert(ctsv == "hello" && fs == "hello");
 ```
 
-Utrumque genus cum altero confertur, cuiusvis speciei et magnitudinis, atque cum his:
+Utrumque genus cum altero eiusdem generis characterum confertur, cuiusvis speciei et magnitudinis, atque cum his:
 
-- cum litteralibus, et cum areis vel indicibus sui generis characterum, sive `const` sive non; quae usque ad primum characterem nullum leguntur;
+- cum litteralibus, areis et indicibus eiusdem generis characterum, sive `const` sive non; ex his characteres usque ad primum characterem nullum leguntur;
 - cum `std::basic_string` et `std::basic_string_view` eiusdem generis characterum;
-- cum quavis alia re quae, per referentiam `const` lecta, in `std::basic_string_view` eius generis characterum sine exceptione convertitur; sic enim quaeque comparatio eam legit.
+- cum quavis alia re quae ex relatione `const T&` in `std::basic_string_view` eiusdem generis characterum sine exceptione convertitur; sic enim quaeque comparatio eam accipit.
 
-Altera pars utrimque poni potest; `==`, `!=`, `<`, `<=`, `>`, `>=`, `<=>` omnia valent. Omnes hae comparationes `noexcept` sunt, quacumque bibliotheca standard utaris. Chordae alterius generis characterum, atque `nullptr`, compositionis tempore recusantur. Ut in `std::basic_string_view`, index `nullptr` esse non debet, et area vel index nullo charactere terminari debet.
+Alterum argumentum a sinistra vel a dextra poni potest; `==`, `!=`, `<`, `<=`, `>`, `>=`, `<=>` omnia valent. Omnes hae comparationes `noexcept` sunt, quacumque bibliotheca standard utaris. Chordae alterius generis characterum, atque `nullptr`, compositionis tempore recusantur. Ut in `std::basic_string_view`, index nullus esse non debet; area autem, vel series characterum ad quam index spectat, charactere nullo terminata esse debet.
 
 Nomina commodiora:
 
@@ -221,7 +221,7 @@ auto good() -> cps::ct_string::ct_cstring_view {
 }
 ```
 
-Constructores publici sunt:
+Praeter constructorem vacuum, constructores publici sunt:
 
 - copia aut motus eiusdem vel alterius speciei;
 - via `consteval` (`_ctsv`, `make_ctsv`, `basic_ct_sv_factory`) quae `basic_fixed_string` NTTP accipit, cuius memoria natura sua per totum programma manet.
@@ -238,7 +238,7 @@ std::ranges::find("x"_ctsv, 'y')
 
 **Cur hoc pertinet?** `std::string_view` tribus praecipue modis adhibetur:
 
-1. ut litteralia chorda melius quam `const char*` condantur, magnitudine retenta et interface bibliothecae ad legendum accepta;
+1. ut litteralia chordarum melius quam `const char*` condantur, magnitudine retenta atque operationibus bibliothecae ad legendum praebitis;
 2. ut argumentum functionis, cum genus rei subiectae nihil intersit;
 3. ut partes chordae O(1), sine memoria nova, efficiantur.
 
@@ -340,7 +340,7 @@ Quod inde fit, rursus NTTP esse potest; ita programmatio generica super chordis 
 
 ```c++
 template<basic_fixed_string Greeting>
-auto get_greeting() {
+constexpr auto get_greeting() {
     return cps::ct_string::make_ctsv<Greeting>();   // ct_cstring_view
 }
 
@@ -357,25 +357,29 @@ const char* p = g.c_str();   // points into a static-storage NTTP buffer
 
 ### Difficultas
 
-`basic_ct_string_view` clavis receptaculi aptissima est: duorum verborum, simpliciter copiabilis, memoria eius receptaculum certo superat. Sed consulto stricta est: ex `std::string_view` effici nequit; aliter origo compositionis tempore et terminatio nullo charactere falso fingerentur.
+`basic_ct_string_view` clavis receptaculi aptissima est: duorum verborum, proprietatem `trivially copyable` habens, cuius memoria receptaculum certo superat. Sed consulto stricta est: ex `std::string_view` effici nequit; aliter origo compositionis tempore et terminatio nullo charactere falso fingerentur.
 
 Haec severitas, quae insertioni prodest, inquisitioni obstare potest. Praeterea inquisitio heterogenea bibliothecae standard nondum integra est:
 
 | Operatio | Heterogenea in bibliotheca standard? |
 |---|---|
-| `find`, `contains`, `count`, `lower_bound`, `equal_range` | ita, C++14 ordinatis / C++20 inordinatis |
-| `erase(key)` | tantum a C++23, condicionibus non simplicibus |
-| **`at(key)`** | **non; `const key_type&` accipit** |
-| `operator[]` | non, recte quidem: inserit |
+| `find`, `count`, `equal_range` | a C++14 in ordinatis; a C++20 in inordinatis |
+| `lower_bound`, `upper_bound` | a C++14 in ordinatis; in inordinatis absunt |
+| `contains` | a C++20 in utrisque |
+| `erase(key)` | a C++23 in utrisque, condicionibus propriis |
+| **`at(key)`** | **in C++20/C++23 non; `const key_type&` accipit** |
+| `operator[]` | in C++20/C++23 non; inserere enim potest |
 
-Ita operatio frequentissima — clavem quaerere et valorem accipere — ipsa non componebatur.
+Hae operationes heterogeneae comparatores transparentes, in receptaculis inordinatis etiam functiones hash transparentes, requirunt. C++26 etiam `at` et `operator[]` heterogenea addit; haec bibliotheca C++20 sustinet.
+
+Ita operatio frequentissima — clavem quaerere et valorem accipere — in C++20/C++23 ipsa non componebatur.
 
 ### Remedium: receptacula quorum insertio ab inquisitione genere distinguitur
 
 `<ct_str/ctsv_containers.hpp>` quattuor formas praebet:
 
 - **Insertio** (`operator[]`, `insert`, `emplace`, `try_emplace`, ...) verum `basic_ct_string_view` requirit. Alia res clavem efficere non potest; receptaculum igitur clavem breviorem se numquam possidet.
-- **Inquisitio** (`at`, `at_if`, `find`, `contains`, `count`, `erase`, `lower_bound`, ...) `std::basic_string_view` **valore** accipit. Utraque species `basic_ct_string_view`, `std::basic_string`, `basic_fixed_string`, litterale implicite convertuntur. `nullptr` et `0` litterale compositionis tempore recusantur.
+- **Inquisitio** (`at`, `at_if`, `find`, `contains`, `count`, `erase`, `lower_bound`, ...) `std::basic_string_view` **valore** accipit. Utraque species `basic_ct_string_view`, item `std::basic_string`, `basic_fixed_string` atque litteralia, implicite convertuntur. Si `nullptr` vel litterale `0` directe traditur, vocatio compositionis tempore recusatur.
 
 ```c++
 #include <ct_str/ctsv_containers.hpp>
@@ -426,7 +430,7 @@ Nomina commodiora pro `char` et `wchar_t`, utraque specie, casu servato aut negl
 
 Involucra `multimap` et `multiset` non praebentur.
 
-### Comparatores et hashes
+### Comparatores et functiones hash
 
 `<ct_str/ctsv_comparators.hpp>` haec functionum obiecta praebet, casu servato et ASCII casu neglecto:
 
@@ -447,10 +451,10 @@ static_assert(ctsv_ci_hash<char>{}("Ace") == ctsv_ci_hash<char>{}("ACE"));
 
 Quattuor scienda sunt:
 
-1. **Quo versus casus mutetur, ordinem mutat.** Haec ad litteras minores vertunt. `'_'` (`0x5F`) inter `'Z'` (`0x5A`) et `'a'` (`0x61`) iacet; quare `"Z"` post `"_"` ordinatur. Si ad maiores verteretur, contra. Uterque ordo rectus; sed uter habeatur sciendum.
+1. **Ordo ex eo pendet utrum litterae ad minores an ad maiores convertantur.** Haec ad litteras minores vertunt. `'_'` (`0x5F`) inter `'Z'` (`0x5A`) et `'a'` (`0x61`) iacet; quare `"Z"` post `"_"` ordinatur. Si ad maiores verteretur, contra. Uterque ordo rectus; sed uter habeatur sciendum.
 2. **Ordo casum neglegens debilis, non fortis est.** `"abc"` et `"ABC"` aequivalent, quamquam aequalia non sunt; `ctsv_ci_three_way` igitur `std::weak_ordering`, `ctsv_three_way` autem `std::strong_ordering` reddit.
-3. **`ctsv_hash` non est `std::hash`.** `std::hash` `constexpr` non est; structura igitur tempore compositionis effici aut `static_assert` probari non potest. Hic FNV-1a super unitates characterum adhibetur. Qui hash standard vult, `std::hash<basic_ct_string_view<TChar, B>>` aperte tradat.
-4. **`nullptr` numquam clavis est.** Sive his obiectis, sive `std::hash<basic_ct_string_view<TChar, B>>`, sive inquisitioni receptaculi traditur, compositionis tempore recusatur, quacumque bibliotheca standard aut editione linguae utaris. Nam in C++20 `std::basic_string_view` ipsa etiamnunc ex `nullptr` convertitur; vocatio effectum indefinitum haberet.
+3. **`ctsv_hash` non est `std::hash`.** `std::hash` `constexpr` non est; eo igitur adhibito, receptacula tempore compositionis construi aut per `static_assert` probari non possunt. Hic FNV-1a super unitates characterum adhibetur. Qui functionem hash bibliothecae standard vult, `std::hash<basic_ct_string_view<TChar, B>>` aperte tradat; haec specialitas `is_transparent` praebet atque cum `std::equal_to<>` recte coniungitur.
+4. **`nullptr` numquam clavis est.** Si `nullptr` cuiquam horum obiectorum, obiecto generis `std::hash<basic_ct_string_view<TChar, B>>`, aut inquisitioni receptaculi directe traditur, vocatio compositionis tempore recusatur, quacumque bibliotheca standard aut editione linguae utaris. In C++20 enim `nullptr` adhuc in `std::basic_string_view` implicite converti potest; ea autem conversio effectum indefinitum haberet.
 
 ### Tantum ASCII
 
@@ -470,13 +474,13 @@ transparent_ctsv_hash<F, TChar>
 consistent_ctsv_hash_equal<THash, TEq, TChar>
 ```
 
-Singula constructionem default sine exceptione, `is_transparent`, atque rectum `noexcept` usum in omni coniunctione `{cstr view, non-cstr view, std::basic_string_view}` utroque ordine exigunt. `std::less<>` et `std::equal_to<>` satisfaciunt; `std::less<std::string_view>` non, quia transparent non est.
+Singuli constructionem default sine exceptione, `is_transparent`, atque rectum `noexcept` usum in omni coniunctione `{cstr view, non-cstr view, std::basic_string_view}` utroque ordine exigunt. `std::less<>` et `std::equal_to<>` satisfaciunt; `std::less<std::string_view>` non, quia transparens non est.
 
 `consistent_ctsv_hash_equal` praecipue curandum. In receptaculo inordinato claves aequales eundem hash habere debent. Aequalitatem casum neglegentem cum hash casum servantem iungere conditionem tacite frangeret: `"Ace"` et `"ACE"` simul condi possent, quamquam aequalia referrentur. `requires` hoc compositionis tempore recusat. Participatio per `ctsv_folds_case` indicatur, quod initio `false` est; ita genera externa ut `std::hash` et `std::equal_to<>` inter se recte coniunguntur.
 
 ### Ex nominibus veteribus migrandum
 
-Versiones anteriores simplicia alias templates in `ct_string_view.hpp` praebebant. Illa remota sunt. Nomina concreta — ut `ct_cstring_view_map<V>` — manent, sed nunc involucra propria significant; `<ct_str/ctsv_containers.hpp>` igitur includendum est. `ct_string_view.hpp` iam `<map>`, `<set>`, `<unordered_map>`, `<unordered_set>` non trahit.
+Versiones anteriores formas quae nomina alternativa definiunt in `ct_string_view.hpp` praebebant. Hae remotae sunt. Nomina concreta — ut `ct_cstring_view_map<V>` — manent, sed nunc involucra propria significant; `<ct_str/ctsv_containers.hpp>` igitur includendum est. `ct_string_view.hpp` iam `<map>`, `<set>`, `<unordered_map>`, `<unordered_set>` non trahit.
 
 Formae generales `basic_ct_string_view_*` in `basic_ctsv_*` mutatae sunt; `multimap` et `multiset` non servantur.
 
@@ -511,7 +515,7 @@ Quo ordine capita includantur, nihil refert; nec ullum macro manu definiendum es
 
 `<ct_str/char_fold.hpp>` infimum huius apparatus stratum praebet, etiam separatim utile:
 
-- `ascii_to_lower<TChar>` / `ascii_to_upper<TChar>`: functionum obiecta `constexpr`, `noexcept`, sine memoria, quae unam unitatem mutant;
+- `ascii_to_lower<TChar>` / `ascii_to_upper<TChar>`: functionum obiecta `constexpr`, `noexcept`, quae sine memoria adsignanda unam unitatem mutant;
 - `views::ascii_lower` / `views::ascii_upper`: adaptores pigri super quamlibet seriem characterum. Exitus `std::ranges::transform_view`; nihil copiatur, nulla memoria nova sumitur.
 
 ```c++
@@ -529,7 +533,9 @@ bool same = std::ranges::equal(views::ascii_lower("Hello"_ctsv),
                                views::ascii_lower("hELLO"_ctsv));   // true
 ```
 
-Quoniam `std::basic_string_view` et `basic_ct_string_view` borrowed ranges sunt, prospectus ex eis facti non pendent. Conversio consulto ASCII tantum est; ceterae unitates intactae transeunt.
+Omnes species `basic_ct_string_view` pendere non possunt: hoc ipsius generis condiciones praestant. Prospectus pigri ex eis facti eandem memoriam staticam characterum adhibent; ex `std::basic_string_view` facti memoriam characterum adhuc validam requirunt. Participatio in `borrowed_range` vitam memoriae characterum non prorogat; iteratores autem `transform_view` prospectu transformato adhuc vivo adhibendi sunt.
+
+Conversio consulto ASCII tantum est; ceterae unitates intactae transeunt. UTF-8/16/32 igitur non corrumpuntur; vide [Tantum ASCII](#tantum-ascii).
 
 ---
 
@@ -572,7 +578,7 @@ Exemplum plenum in `fmt_reg_demo.hpp` / `.cpp`, intra `test_console_app`, inveni
 |---|---|---|
 | `c_str()` | adest; indicem nullo charactere certo terminatum reddit | abest |
 | `data()` | adest; idem ac `c_str()` | adest; terminatio incerta |
-| Constructor default | prospectus vacuus ad staticum `'\0'` | prospectus vacuus; `data()` non definitur |
+| Constructor default | prospectus vacuus ad staticum `'\0'` | prospectus vacuus; `data() == nullptr` |
 | `remove_prefix(n)` | licet | licet |
 | `remove_suffix(n)` | **prohibetur**, quia terminationem frangeret | licet |
 | `substr(pos)` | eandem speciem reddit | eandem speciem reddit |
@@ -598,11 +604,11 @@ Commoda:
 
 Incommodum:
 
-1. `ct_cstring_view` instantiandum plus compositionis constat quam `std::string_view`.
+1. ad `ct_cstring_view` instantiandum plus temporis opus est quam ad `std::string_view`.
 
 Si instantiationes in capite late incluso multae sunt atque mora manifesta fit, via altera consideranda.
 
-Codex exemplaris idem manet:
+Exemplum:
 
 ```c++
 #ifndef CSTR_VIEW_HEADER_ONLY_VIEWS_HPP
@@ -684,13 +690,13 @@ R"(     THIS is the forest primeval. The murmuring pines and the hemlocks,
 
 ### Via II: declarare in capite, definire in `.cpp` per `constinit`
 
-Si caput magnum et late inclusum compositionem manifeste tardat, variabiles in capite declarari, in translation unit per `constinit` definiri possunt.
+Si caput magnum et late inclusum compositionem manifeste tardat, variabiles in capite declarari, in unitate translationis per `constinit` definiri possunt.
 
-`constinit` definitioni, non declarationi, adhibetur; neque `const` significat. Si constantes globales volumus, `const` utroque loco ponendum. `constinit` hic non ad mutabilitatem, sed ad declarationem a definitione separandam adhibetur.
+`constinit` in hoc exemplo definitioni tantum adhibetur; etiam in declaratione poni potest. Initializationem staticam praestat, sed neque `const` neque `constexpr` significat. Si constantes globales volumus, `const` utroque loco ponendum. Declaratio in capite a definitione separatur; `constinit` efficit ne initializatio ad tempus executionis differatur.
 
 In opere ubi multa protobuf capita iam includuntur, differentia fortasse exigua erit; ubi autem tempus compositionis diligenter minuitur, exempli causa PImpl late adhibito, haec via melior esse potest. Aliter prior brevior.
 
-Header:
+Caput:
 
 ```c++
 #ifndef CSTR_VIEW_IMPL_VIEWS_HPP
@@ -718,7 +724,7 @@ namespace cps::ct_string::example_impl
 #endif
 ```
 
-Translation unit:
+Unitas translationis:
 
 ```c++
 #include "impl_views.hpp"
@@ -818,7 +824,7 @@ implicit conversion to std string    explicit (allocates)
 
 ## Aedificatio et coniunctio
 
-Bibliotheca solis capitibus constat.
+Bibliotheca solis capitibus constat. Ad capita manu includenda C++20 sufficit; nulla bibliotheca externa necessario requiritur. Apparatus CMake autem, qui probationes et programma demonstrativum semper aedificat, etiam cum in alio opere includitur, CMake 4.0.2 vel posterius, fmt, GoogleTest atque instrumentum C++23 requirit.
 
 ### CMake (`FetchContent`)
 
@@ -826,7 +832,7 @@ Bibliotheca solis capitibus constat.
 include(FetchContent)
 FetchContent_Declare(
     cstr_view
-    GIT_REPOSITORY https://github.com/<your-org>/cstr_view.git
+    GIT_REPOSITORY https://github.com/cpsusie/ct_string.git
     GIT_TAG        main
 )
 FetchContent_MakeAvailable(cstr_view)
@@ -873,21 +879,21 @@ invenitur.
 
 ### Norma linguae: bibliotheca et probationes
 
-**Bibliotheca C++20 est.** Target `cstr_view` minimum declarat per:
+**Bibliotheca C++20 est.** Propositum aedificationis (`target`) `cstr_view` hanc normam minimam declarat per:
 
 ```cmake
 target_compile_features(cstr_view INTERFACE cxx_std_20)
 ```
 
-**Probationes et programma demonstrativum C++23 sunt** — hoc `std::expected` utitur — atque singulis targetis:
+**Probationes et programma demonstrativum C++23 sunt** — hoc `std::expected` utitur — atque singulis propositis aedificationis:
 
 ```cmake
 target_compile_features(... PRIVATE cxx_std_23)
 ```
 
-petitur; `CMAKE_CXX_STANDARD` totius operis non tollitur.
+petitur; `CMAKE_CXX_STANDARD` totius operis non augetur.
 
-Ne hae duae res paulatim confundantur, build continet bibliothecam staticam `cstr_view_cxx20_smoke`, quae C++20 firmiter retinet. Unum eius translation unit, [`tests/cxx20_header_smoke.cpp`](tests/cxx20_header_smoke.cpp), omnia capita publica includit formasque instantiat. Alterum, [`tests/cxx20_comparison_checks.cpp`](tests/cxx20_comparison_checks.cpp), solis probationibus compositionis tempore constat: quibuscum duo genera conferantur, quibuscum non. Probat etiam nullum comparatorem, nullum hash, nullam inquisitionem receptaculi `nullptr` accipere. Si quid C++23 tantum in `inc/ct_str` ingreditur, aut si qua comparatio ab una bibliotheca standard recusatur, hic target statim frangitur; non exspectatur donec usor instrumento vetustiore laboret.
+Ad hanc distinctionem servandam, apparatus aedificationis bibliothecam staticam `cstr_view_cxx20_smoke` complectitur, cui norma C++20 expresse imponitur. Una eius unitas translationis, [`tests/cxx20_header_smoke.cpp`](tests/cxx20_header_smoke.cpp), omnia capita publica includit formasque instantiat; altera, [`tests/cxx20_comparison_checks.cpp`](tests/cxx20_comparison_checks.cpp), solas probationes tempore compositionis peragendas continet. Hae explorant quibuscum duo genera conferantur, quibuscum non; confirmant etiam nullum comparatorem, nullam functionem hash, nullam inquisitionem receptaculi `nullptr` directe accipere. Si constructio quae C++23 requirit in `inc/ct_str` ingreditur, aut si qua comparatio a bibliotheca standard in qua probatur recusatur, huius bibliothecae aedificatio statim deficit; non exspectatur donec usor instrumento vetustiore laboret.
 
 ---
 
@@ -902,9 +908,9 @@ Ne hae duae res paulatim confundantur, build continet bibliothecam staticam `cst
 - In Linux/x86_64 verificatum cum **GCC 13**, GCC 14, Clang 19; bibliotheca C++20, probationes C++23.
 - GCC 13 terminus inferior consulto est: eius libstdc++ `std::ranges::to` (P1206R7) nondum habet; quare neque bibliotheca neque probationes eo niti possunt.
 - Cum `fmtlib` et sine eo probatum.
-- Praeter libstdc++ et STL MSVC, etiam **libc++ 17** et posteriores adhiberi possunt. Hoc in Linux/x86_64 domi verificatum est, cum Clang 17 + libc++ 17 et cum Clang 20 + libc++ 20; cum posteriore etiam probationes C++23 succedunt. CI libc++ nondum probat.
-- `std::formatter`, si adhibetur, `<format>` requirit atque `__cpp_lib_format >= 201907L`. libc++ hoc macro a versione 19 demum definit; cum libc++ 17 et 18 igitur `std::formatter` omittitur.
-- Membrum `contains`, si standard praesto est, `string_view::contains` utitur (`__cpp_lib_string_contains >= 202011L`); aliter per `find` efficitur.
+- Praeter libstdc++ et bibliothecam STL MSVC, etiam **libc++ 17** et versiones posteriores adhiberi possunt. Hoc in instrumento locali Linux/x86_64 verificatum est, cum Clang 17 + libc++ 17 et cum Clang 20 + libc++ 20; cum posteriore etiam probationes C++23 succedunt. CI libc++ nondum probat.
+- `std::formatter`, si adhibetur, `<format>` requirit atque `__cpp_lib_format >= 201907L`. libc++ hanc macrodefinitionem a versione 19 demum definit; cum libc++ 17 et 18 igitur specialitas `std::formatter` huius bibliothecae omittitur.
+- Membrum `contains`, si in bibliotheca standard praesto est, `string_view::contains` utitur (`__cpp_lib_string_contains >= 202011L`); aliter per `find` efficitur.
 
 ---
 
