@@ -48,8 +48,13 @@ target_compile_options(ct_str_warnings INTERFACE ${CT_STR_WARNING_FLAGS})
 # C++23-only construct creeping into inc/ct_str is a build failure here rather
 # than a surprise for a C++20 consumer. The standard is set via target
 # properties (not merely cxx_std_20, which is a *minimum* and would happily be
-# raised by anything else in the build).
-add_library(cstr_view_cxx20_smoke STATIC tests/cxx20_header_smoke.cpp)
+# raised by anything else in the build). A second TU, made only of
+# compile-time checks, pins down what the two class templates compare with
+# (D-030); being here, it runs wherever the C++20 floor is checked.
+add_library(cstr_view_cxx20_smoke STATIC
+        tests/cxx20_header_smoke.cpp
+        tests/cxx20_comparison_checks.cpp
+)
 target_link_libraries(cstr_view_cxx20_smoke PRIVATE cstr_view fmt::fmt-header-only ct_str_warnings)
 set_target_properties(cstr_view_cxx20_smoke PROPERTIES
         CXX_STANDARD 20

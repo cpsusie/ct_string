@@ -15,6 +15,7 @@
 #include <ct_str/ctsv_containers.hpp>
 
 #include <algorithm>
+#include <iterator>
 #include <ranges>
 #include <stdexcept>
 #include <string>
@@ -526,6 +527,47 @@ TEST(CtsvWideContainers, CaseInsensitiveWideMap)
     ct_wcstring_view_ci_unordered_map<int> um;
     um[make_ctsv<L"King">()] = 13;
     EXPECT_EQ(um.at(std::wstring_view{L"KING"}), 13);
+}
+
+// ============================================================
+//  Empty braces
+// ============================================================
+//
+// A lookup taking {} looks up the empty key, as std::basic_string_view{} is
+// empty. The deleted overloads that reject nullptr (D-032) must not take {}.
+
+TEST(CtsvEmptyBraces, LookUpTheEmptyKeyInEveryWrapper)
+{
+    ct_cstring_view_map<int> m;
+    m[""_ctsv]  = 7;
+    m["a"_ctsv] = 1;
+    const auto& cm = m;
+    ASSERT_NE(m.at_if({}), nullptr);
+    EXPECT_EQ(*m.at_if({}), 7);
+    EXPECT_EQ(cm.at({}), 7);
+    EXPECT_EQ(m.find({}), m.begin());
+    EXPECT_EQ(cm.count({}), 1u);
+    EXPECT_EQ(m.upper_bound({}), std::next(m.begin()));
+
+    ct_cstring_view_set s;
+    s.insert("a"_ctsv);
+    EXPECT_FALSE(s.contains({}));
+    s.insert(""_ctsv);
+    EXPECT_TRUE(s.contains({}));
+    EXPECT_EQ(s.lower_bound({}), s.begin());
+
+    ct_cstring_view_unordered_map<int> um;
+    um[""_ctsv] = 7;
+    EXPECT_EQ(um.at({}), 7);
+    EXPECT_NE(um.find({}), um.end());
+
+    ct_string_view_unordered_set us;
+    us.insert("a"_ctsv);
+    EXPECT_EQ(us.count({}), 0u);
+    us.insert(""_ctsv);
+    EXPECT_TRUE(us.contains({}));
+    const auto [first, last] = us.equal_range({});
+    EXPECT_EQ(std::distance(first, last), 1);
 }
 
 // ============================================================

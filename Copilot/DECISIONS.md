@@ -81,6 +81,10 @@ reused, so they may appear out of numeric order.
   - **Update (2026-10-11):** you accepted Q-16, so from T5 on the rulesets enforce this: squash
     only into `develop-release_1`, merge commits only into `main`. Until then, task PRs can be
     merged either way.
+- **Update (2026-10-11, during T3):** Copilot opens each task's PR itself, as soon as it can meet
+  the task's definition of done without further input from you. You still review and merge by
+  hand. In your words: "Please open PRs when you can satisfy phase requirements without further
+  input from me. I will review and merge manually."
 
 ### D-004 The Task 1 PR changes documentation only, and README/LEGENDUM stay unchanged
 - **Date:** 2026-10-10. **Status:** Accepted (T1, PR #14). **Related:** T1, D-025.
@@ -207,7 +211,8 @@ reused, so they may appear out of numeric order.
   would go untested on Windows.
 
 ### D-024 libc++ incompatibility is a bug, fixed whatever the macOS scope
-- **Date:** 2026-10-10. **Status:** Accepted (T1, PR #14). **Related:** T3, T8, F-5, Q-07, Q-22.
+- **Date:** 2026-10-10. **Status:** Accepted (T1, PR #14). **Related:** T3, T8, F-5, Q-07, Q-22,
+  D-030.
 - **Decision:**
   - Fix the comparison operators so they compile with any conforming standard library, keeping
     their meaning and an accurate `noexcept`.
@@ -217,14 +222,217 @@ reused, so they may appear out of numeric order.
   - The current code depends on a vendor-specific `noexcept` strengthening, which contradicts the
     brief's "rely on standard C++".
   - It blocks every libc++ user, including Conan profiles that use libc++.
-- **How:** the design is Q-22. T3's PR records it as a new decision.
+- **How:** the design is D-030 (Q-22, answered in T3).
+
+---
+
+## Library design
+
+### D-030 The comparison operators name arrays and pointers of their own character type, and never accept `nullptr`
+- **Date:** 2026-10-11. **Status:** Proposed. **Related:** T3, F-5, D-024, Q-22, Q-24.
+- **Context:**
+  - Four operator templates, `operator==` and `operator<=>` in `basic_ct_string_view` and in
+    `basic_fixed_string`, accepted an operand only if it was nothrow-convertible to the string
+    view (F-5).
+  - Literals, arrays and pointers convert through `std::basic_string_view`'s constructor from a
+    pointer. The standard does not make it `noexcept`; libstdc++ and the MSVC STL do, libc++ does
+    not. With libc++ these comparisons did not compile.
+  - With libstdc++ in C++20 mode, `view == nullptr` compiled and then had undefined behaviour.
+    C++23 (P2166) and libc++ reject it.
+- **Decision (Q-22, answered with the default, option a):**
+  - One constraint, `detail::string_view_comparand` (`fixed_string.hpp`), is used by all four
+    templates. It is not part of the public API.
+  - It accepts arrays of, and pointers to, the class's own character type, `const` or not, by
+    name. It also accepts, as before, anything else that converts to `std::basic_string_view` of
+    that character type without throwing. The conversion checked, and used, is the one from a
+    `const` lvalue, since the operators take the operand by `const` reference; what the type does
+    as an rvalue does not matter. README says so too, after Codex's review of PR #17.
+  - It rejects `std::nullptr_t`, on every standard library and language version.
+  - The operators stay unconditionally `noexcept`. Their meaning is unchanged: the other operand is
+    converted to a string view, so an array or a pointer is read up to its first null character.
+  - The constraint checks the conversion of `const T&`, which is exactly what the operators'
+    bodies convert, rather than of an rvalue of the deduced type `T`. For every documented operand
+    the answer is the same. It differs only for types whose conversions are ref-qualified
+    differently:
+    - a `const&` conversion that may throw, with a `noexcept` rvalue one: no longer accepted.
+      Before, it was accepted, and a throw inside the `noexcept` operator would have called
+      `std::terminate`;
+    - a conversion from rvalues only: no longer a candidate. Before, the operator was chosen and
+      then failed to compile;
+    - a `noexcept` `const&` conversion, with the rvalue one deleted: now accepted. Before, it was
+      rejected.
+- **Why:**
+  - The accepted operands, and `noexcept`, are the same on every standard library (D-024).
+  - `noexcept` is accurate. The conversion of an array or a pointer cannot throw; its only
+    precondition, a null character, is the caller's, exactly as with `std::basic_string_view`.
+  - Types whose conversion can throw stay non-comparable, as before.
+  - Comparing with `nullptr` is never valid, so a compile error replaces undefined behaviour.
+  - Sharing one constraint keeps the two class templates from drifting apart.
+- **Verified (T3):**
+  - Tests were written first. On the old headers, the new compile-time checks fail with libc++ at
+    every literal, array and pointer check and at the Q-23 assertion (71 errors, with Clang's error
+    limit off). With libstdc++ in C++20 mode they fail at the `nullptr` and Q-23 assertions.
+  - A further check, added after review, covers an operand whose conversion from a `const` lvalue
+    may throw (the first of the cases above). On the old headers it fails with every library
+    (3 more errors, 74 in all with libc++); on the new ones it passes.
+  - The C++20 smoke target, with the new checks, builds with `-Werror` on GCC 11.1 (official
+    container), 12, 13 and 14; Clang 17, 18 and 20 with libstdc++; Clang 17 + libc++ 17; and
+    Clang 20 + libc++ 20. The checks also pass in C++23 mode.
+  - The suite (175 tests) passes on GCC 14 and Clang 20 with libstdc++, Debug and Release, and on
+    Clang 20 + libc++ 20 with GoogleTest built against libc++. The demo passes everywhere it was
+    built, including libc++ 20 with fmt used header-only.
+- **Alternatives:**
+  - Q-22 option (b): plain convertibility with a conditional `noexcept`. `noexcept(view == "x")`
+    would then be false with libc++ only, and types whose conversion can throw would become
+    comparable.
+  - A separate constraint in each class. The two could drift apart.
+  - A public concept. It would add a name that Semantic Versioning then freezes after 1.0.
+- **Not covered:** `ctsv_comparators.hpp` and the container lookups take
+  `std::basic_string_view`, so they follow its rules: in C++20 mode they still accept `nullptr`
+  (Q-24). D-032, also in T3, makes them reject it.
+
+### D-031 Public concepts next to `nothrow_convertible_to`: fix the misnamed one, keep all four
+- **Date:** 2026-10-11. **Status:** Proposed. **Related:** T3, Q-23.
+- **Context:** `fixed_string.hpp` defines four public concepts that nothing in the library, the
+  tests or the demo used. One, `not_exact_same_nothrow_convertible_to`, did not check `noexcept`,
+  despite its name.
+- **Decision (Q-23, option a; you confirmed Copilot's reading of your answer in the T3 PR):**
+  - `not_exact_same_nothrow_convertible_to<T1, T2>` now means `not_exact_same_convertible_to<T1, T2>`
+    and `nothrow_convertible_to<T1, T2>`, as its name says.
+    `tests/cxx20_comparison_checks.cpp` checks it with a type whose conversion can throw and one
+    whose conversion cannot.
+  - The other three concepts stay as they are.
+- **Why:**
+  - After 1.0, Semantic Versioning would freeze the wrong meaning.
+  - Nothing used the concept, so the fix breaks nothing here. Code elsewhere that used it gets the
+    meaning its name promised.
+  - Removing public names is a larger change than this task needs.
+- **Alternatives:** remove all four before 1.0 (Q-23 b); leave them as they are (Q-23 c).
+
+### D-032 No comparator, hasher or container lookup accepts `nullptr`
+- **Date:** 2026-10-11; revised 2026-10-12 after Codex's review of PR #17. **Status:** Proposed.
+  **Related:** T3, Q-24, Q-26, D-030, F-14.
+- **Context:**
+  - D-030 makes the four comparison operators reject `nullptr`. The rest of the library's
+    comparison and lookup code takes, or converts to, `std::basic_string_view`. In C++20,
+    `std::basic_string_view` still converts from `nullptr`; C++23 (P2166) removes that
+    conversion. So in C++20 mode, with libstdc++ 14 and with libc++ 20, these compiled, and the
+    call had undefined behaviour:
+    - the six comparators and two hashers in `ctsv_comparators.hpp`, because `std::nullptr_t`
+      satisfied their concept `ctsv_lookup_key`;
+    - every lookup member of the four containers in `ctsv_containers.hpp`, 40 declarations in all.
+      They take the key as `std_sv_type`, by value. A literal `0` was accepted too.
+  - `std::hash<basic_ct_string_view>` accepted `nullptr` in every language version, C++23
+    included, through its overload for `const char_type*`.
+- **Decision (Q-24, option a, which you asked T3 to apply):**
+  - `ctsv_lookup_key` excludes `std::nullptr_t`, whatever its cv-qualifiers, with the same test as
+    D-030. All the comparators and hashers in `ctsv_comparators.hpp` are constrained on it.
+  - Each of the 40 lookup declarations in the containers gets a deleted twin, `const`-qualified
+    like the original, whose parameter is deduced and constrained by `detail::null_or_integer`:
+    its type must be `std::nullptr_t` or an integer type. `nullptr`, a literal `0` and `NULL`
+    deduce such a type and match the twin exactly, better than `std_sv_type`, so the call names a
+    deleted function. The compiler then points at a comment block that explains why. No argument
+    of an integer type was ever a key, so nothing that worked is lost.
+  - `std::hash<basic_ct_string_view>` gets a deleted `operator()(std::nullptr_t)`. With it, a
+    literal `0` is ambiguous, so it does not compile either.
+  - The inserting members are unchanged. They take `key_type`, which `nullptr` never converted
+    to.
+- **Revised in review.** The first version, reviewed by Codex at 32af580, gave the twins a concrete
+  `std::nullptr_t` parameter. That rejected two kinds of call that were valid and had no undefined
+  behaviour:
+  - empty braces, as in `m.contains({})`, which look up the empty key. `{}` initialises
+    `std::nullptr_t` by a standard conversion, and `std_sv_type` only by a user-defined one, so the
+    deleted twin won. Every such lookup, on a `const` container or not, compiled on the T3 base,
+    and none did at 32af580. (`erase({})` was already ambiguous with the iterator overloads, as
+    for the standard containers.)
+  - a key type that converts both to `std::basic_string_view` and to `std::nullptr_t`. Both
+    conversions are user-defined, so the call became ambiguous.
+
+  A deduced parameter fixes both: `{}` deduces no type, so the twin is not a candidate, and such a
+  key type deduces itself, which is neither `std::nullptr_t` nor an integer. `std::hash` keeps its
+  concrete overload on purpose. There, `{}` used to select the overload for `const char_type*`
+  with a null pointer, which is undefined behaviour; the concrete overload makes the call
+  ambiguous, so it does not compile. A deduced one would let it through again. The key type with
+  both conversions was already ambiguous there, against the same pointer overload.
+- **Why:**
+  - The reason of D-030: a lookup with `nullptr` is never meaningful. A compile error replaces
+    undefined behaviour, with every standard library and in every language version.
+  - Deleted overloads leave each lookup's signature, its `noexcept` and the keys it accepts as
+    they were. Turning the 40 lookups into constrained templates would change documented
+    signatures for the same effect. Only the deleted twins are templates.
+  - Because the twin is qualified like the original, it is the best match. The diagnostic then
+    names it, instead of reporting an ambiguity.
+  - Its parameter is deduced so that it is a candidate only for an argument that already has a
+    null-pointer type or an integer type. Empty braces, and keys of class type, never reach it.
+- **Verified (T3):**
+  - Tests first. `tests/cxx20_comparison_checks.cpp` checks every comparator and hasher for all
+    five character types. It does the same for `std::less<>`, `std::equal_to<>` and
+    `std::hash<basic_ct_string_view>`. It also checks every lookup member of the four containers,
+    `const` and not, for all five character types (both flavours with `char`), and for the
+    case-insensitive and `std::less<>` variants. Each check also confirms that the keys that worked
+    before still work.
+  - On the T3 headers without this change, 17 of the 19 new assertions failed in C++20 mode: all
+    those that involve `nullptr`. That held with GCC 14, with Clang 20 + libc++ 20, and with
+    Clang 17 + libc++ 17. In C++23 mode, only the five function-object assertions failed, because
+    of `std::hash`.
+  - The same toolchains as D-030 pass, with `-Werror`. On GCC 14 and Clang 20 (libstdc++, and
+    libc++ 20), all 175 tests pass, and the demo exits with 0.
+  - **What the tests cannot see.** A compile-time check sees only that a call does not compile. It
+    cannot tell a deleted overload from an ambiguous call. The review showed that the checks would
+    still pass with any one of 12 non-const twins removed. The diagnostic was therefore checked
+    directly: each of the 40 lookups, `const` or not, was called with `nullptr` and with `0` in
+    its own translation unit, with GCC 14, Clang 20 and Clang 20 + libc++ 20. All 80 calls report
+    a deleted function, and none an ambiguity. Removing one twin turns its diagnostic into
+    "ambiguous".
+- **Verified after the review (deduced twins):**
+  - Tests first again. `looks_up_every_key_but_null` now also requires every lookup of each
+    container, `const` and not, to take `{}`, and a key that converts both to a string view and to
+    `std::nullptr_t`. The `nothrow_only_from_const_lvalue` check, also suggested in the review,
+    confirms that D-030's operators accept an operand whose conversion from a `const` lvalue is
+    `noexcept` even when its conversion from an rvalue is deleted. The suite gains
+    `CtsvEmptyBraces.LookUpTheEmptyKeyInEveryWrapper`, which looks up the empty key with `{}` in
+    all four wrappers: 175 tests became 176. With the 32af580 headers, nine of the container
+    assertions failed with GCC 14 and with Clang 20, and the new test did not compile.
+  - With `-Werror`: the smoke target on GCC 11.1 (official container), 12, 13 and 14; Clang 17, 18
+    and 20 with libstdc++; Clang 17 + libc++ 17; Clang 20 + libc++ 20. The suite (176 tests) and
+    the demo on GCC 14 and Clang 20, Debug and Release, and on Clang 20 + libc++ 20.
+  - Every lookup member of the four containers, on a `const` container and on a non-const one, was
+    called with `nullptr` and with `0` in its own translation unit: 104 calls, `erase` on non-const
+    containers only. With GCC 14, Clang 20 and Clang 20 + libc++ 20, all report a deleted function,
+    and none an ambiguity. So do `0L`, `0u`, `NULL`, `std::nullptr_t{}` and a `const std::nullptr_t`
+    lvalue. Removing one non-const twin still turns its diagnostic into "ambiguous", so the limit of
+    the compile-time checks is unchanged.
+  - Codex's review reported MSVC 19.44 (C++20 and `/std:c++latest`) and Clang 19 with the MSVC STL
+    passing at 32af580, and the deduced twins passing its checks in isolation. MSVC is not
+    available to Copilot; T7 brings it to CI.
+- **Alternatives:**
+  - Q-24 (b): reject `nullptr` in the comparators only, and document that the container lookups
+    follow `std::basic_string_view`.
+  - Q-24 (c): change nothing and document it, since C++23 code was already protected, apart from
+    `std::hash`.
+  - Twins taking a concrete `std::nullptr_t`: the first version. Rejected in review, because they
+    also caught `{}` and keys that convert to `std::nullptr_t` as well (see "Revised in review").
+  - Keeping the concrete twins and documenting the break: the extra calls they reject had no
+    undefined behaviour, so the break would buy nothing.
+- **Not covered:**
+  - the view's members that mirror `std::basic_string_view`: `compare`, `starts_with`,
+    `ends_with`, `contains`, `find` and the other searches. Like the standard's, they take
+    `nullptr` in every language version, through their overloads for `const char_type*` (Q-26).
+  - braced lists, as in `m.find({nullptr})` or `m.find({0})`. They build the `std_sv_type`
+    argument in place, as `std::string_view{nullptr}` would; C++20 allows that, and C++23 rejects
+    it. The first version caught them by accident, since `{nullptr}` also initialises
+    `std::nullptr_t`; the deduced twins do not. On the T3 base they compiled, so nothing regresses.
+    Catching them would take a second deleted twin per lookup, taking a one-element array
+    (`const T (&)[1]`, which `{}` cannot deduce): 40 more declarations, for a spelling as deliberate
+    as `std::string_view{nullptr}`, which no overload can catch. Copilot's own review of the
+    revision found this; the PR asks you to confirm leaving it out.
 
 ---
 
 ## Testing
 
 ### D-029 A test guarded by a feature macro fails the build, rather than vanishing, when the build expects the feature
-- **Date:** 2026-10-11. **Status:** Proposed. **Related:** T2, T5, T11, F-4, Q-02.
+- **Date:** 2026-10-11. **Status:** Accepted (T2, PR #15). **Related:** T2, T5, T11, F-4, Q-02.
 - **Context:**
   - The three fmt tests were wrapped in `#if defined(CJM_CT_STRING_VIEW_HAS_FMT)`, a macro that
     nothing defines (F-4). The preprocessor dropped them without a word, and every run stayed

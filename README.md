@@ -170,8 +170,25 @@ constexpr auto ctsv = "hello"_ctsv;     // basic_ct_string_view<char, true> == c
 static_assert(fs.size()    == 5);
 static_assert(ctsv.size()  == 5);
 static_assert(ctsv.known_cstr);
-static_assert(ctsv == fs);              // also == "hello", == std::string_view{"hello"}, ...
+static_assert(ctsv == fs);              // either order; also !=, <, <=>, ...
+static_assert(ctsv == "hello" && fs == "hello");
 ```
+
+Each of the two types compares with the other, in either flavor and at any
+size, and with:
+
+- string literals, and arrays of or pointers to its own character type,
+  `const` or not. These are read up to their first null character;
+- `std::basic_string` and `std::basic_string_view` of the same character type;
+- anything else that converts to `std::basic_string_view` of that character
+  type without throwing when it is read through a `const` reference, as every
+  comparison reads it.
+
+The other operand may be on either side, and `==`, `!=`, `<`, `<=`, `>`, `>=`
+and `<=>` all work. Every one of these comparisons is `noexcept`, whichever
+standard library you use. Strings of another character type, and `nullptr`, do
+not compile. As with `std::basic_string_view`, a pointer must not be null, and
+an array or a pointer must be null-terminated.
 
 Convenience aliases:
 
@@ -431,7 +448,8 @@ distinction in the type system:
 - **Looking up** (`at`, `at_if`, `find`, `contains`, `count`, `erase`,
   `lower_bound`, ...) takes the `std::basic_string_view` **by value**. Every
   `basic_ct_string_view` (either flavor), `std::basic_string`,
-  `basic_fixed_string` and string literal converts implicitly.
+  `basic_fixed_string` and string literal converts implicitly. `nullptr`, and
+  a literal `0`, do not compile.
 
 ```c++
 #include <ct_str/ctsv_containers.hpp>
@@ -504,7 +522,7 @@ std::ranges::sort(v, ctsv_ci_less<char>{});     // Alpha, Bravo, charlie, delta
 static_assert(ctsv_ci_hash<char>{}("Ace") == ctsv_ci_hash<char>{}("ACE"));
 ```
 
-Three things are worth knowing:
+Four things are worth knowing:
 
 1. **The fold direction is observable.** These fold *down*. `'_'` is `0x5F`,
    between `'Z'` (`0x5A`) and `'a'` (`0x61`), so folding down makes `"Z"`
@@ -518,6 +536,11 @@ Three things are worth knowing:
    testing, so these are FNV-1a over code units. If you need the standard
    library's hash instead, pass `std::hash<basic_ct_string_view<TChar, B>>`
    explicitly -- it is transparent and pairs correctly with `std::equal_to<>`.
+4. **`nullptr` is never a key.** Passing `nullptr` to any of these function
+   objects, to `std::hash<basic_ct_string_view<TChar, B>>`, or to a container's
+   lookup does not compile, whatever the standard library or language version.
+   In C++20, `std::basic_string_view` itself still converts from `nullptr`, and
+   the call would have undefined behaviour.
 
 ### ASCII only
 
@@ -1025,12 +1048,17 @@ floor with `target_compile_features(cstr_view INTERFACE cxx_std_20)`. The
 `CMAKE_CXX_STANDARD` for the rest of the build.
 
 To keep those two facts from drifting apart, the build includes a
-`cstr_view_cxx20_smoke` static library: one translation unit
-([`tests/cxx20_header_smoke.cpp`](tests/cxx20_header_smoke.cpp)) that includes
-every public header, instantiates the templates, and is **pinned** to C++20 via
-target properties. A C++23-only construct landing in `inc/ct_str` therefore
-breaks that target immediately instead of only breaking downstream users on
-older toolchains.
+`cstr_view_cxx20_smoke` static library, **pinned** to C++20 via target
+properties. One translation unit
+([`tests/cxx20_header_smoke.cpp`](tests/cxx20_header_smoke.cpp)) includes
+every public header and instantiates the templates. A second
+([`tests/cxx20_comparison_checks.cpp`](tests/cxx20_comparison_checks.cpp)) is
+made only of compile-time checks: what the two class templates compare with,
+and what they must not. It also checks that no comparator, hasher or
+container lookup takes `nullptr`. A C++23-only construct landing in
+`inc/ct_str`, or a
+comparison that one standard library rejects, therefore breaks that target
+immediately instead of only breaking downstream users on older toolchains.
 
 ---
 
@@ -1047,8 +1075,13 @@ older toolchains.
   predates `std::ranges::to` (P1206R7), so nothing in the library -- or in the
   tests -- may depend on it.
 - Tested with and without `fmtlib`.
+- Besides libstdc++ and the MSVC STL, **libc++ 17 or later** works. This was
+  verified locally on Linux/x86_64, with Clang 17 + libc++ 17 and with
+  Clang 20 + libc++ 20, where the C++23 tests pass too. CI does not check
+  libc++ yet.
 - The optional `std::formatter` support requires `<format>`
-  (`__cpp_lib_format >= 201907L`).
+  (`__cpp_lib_format >= 201907L`). libc++ defines that macro only from
+  version 19, so with libc++ 17 and 18 the `std::formatter` support is left out.
 - The optional `contains` member uses the standard
   `string_view::contains` (`__cpp_lib_string_contains >= 202011L`) when
   available and falls back to a `find`-based implementation otherwise.
