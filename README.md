@@ -6,7 +6,7 @@ A small, header-only C++20 library providing two complementary types built on
 | Type | Header | What it is |
 |---|---|---|
 | `cps::ct_string::basic_fixed_string<TChar, N>` | `<ct_str/fixed_string.hpp>` | A fixed-capacity, null-terminated character buffer that is usable as a non-type template parameter (NTTP). |
-| `cps::ct_string::basic_ct_string_view<TChar, VALID_CSTR>` | `<ct_str/ct_string_view.hpp>` | A non-owning view whose pointee is *statically guaranteed* to be a compile-time constant with static storage duration — and, when `VALID_CSTR == true`, guaranteed to be properly null-terminated. Safe to pass to C APIs. Cannot dangle. |
+| `cps::ct_string::basic_ct_string_view<TChar, VALID_CSTR>` | `<ct_str/ct_string_view.hpp>` | A non-owning view whose pointee is *statically guaranteed* to be a compile-time constant with static storage duration — and, when `VALID_CSTR == true`, guaranteed to be properly null-terminated. In that flavor, safe to pass to C APIs. Cannot dangle. |
 
 If you have ever wanted to write something like
 
@@ -65,8 +65,9 @@ that difference is the whole point:
 - **`std::string` is a promise paid for at runtime.** It enforces ownership
   and null-termination, but by copying and (usually) allocating — a pointless
   cost for data that is immutable and fully known at compile time.
-- **`basic_ct_string_view` is a promise enforced by the compiler.** Its only
-  public constructors are the copy/move/cross-flavor constructors and a
+- **`basic_ct_string_view` is a promise enforced by the compiler.** Apart from
+  default construction, its only public constructors are the
+  copy/move/cross-flavor constructors and a
   `consteval` factory path that consumes a `basic_fixed_string` NTTP — a
   static-storage-duration object by definition. There is *no way* to forge
   one from runtime data, so every copy, everywhere, carries the guarantee.
@@ -117,8 +118,9 @@ properties that bite in production code:
 
 1. **It does not promise null-termination.** A `std::string_view` may be a
    slice of a larger string. If you need a `const char*` to pass to a C API
-   (POSIX, Win32, OpenSSL, SQLite, libcurl, `fopen`, …) you cannot get one
-   from a `string_view` — you must copy into a `std::string` first.
+   (POSIX, Win32, OpenSSL, SQLite, libcurl, `fopen`, …), `data()` supplies a
+   pointer, but the type does not guarantee null-termination. Unless that is
+   known independently, first copy the characters into a `std::string`.
 
 2. **It can dangle.** Nothing in the type stops you from constructing one
    from a temporary `std::string` and outliving it. Some such cases are
@@ -150,8 +152,8 @@ adds:
 | `<ct_str/fixed_string.hpp>` | `basic_fixed_string<TChar, N>`: a structural, NTTP-eligible, null-terminated character buffer with `consteval` concatenation (`operator+`), the `_fs` literal, and the full read-only string interface. | Strings as template arguments; compile-time string building and validation via `static_assert`. See [use case 3](#use-case-3-a-string-as-a-non-type-template-parameter). |
 | `<ct_str/ct_string_view.hpp>` | `basic_ct_string_view<TChar, VALID_CSTR>` in both flavors, the `_ctsv` literal, `make_ctsv`, `basic_ct_sv_factory`, `std::formatter` / optional `fmt::formatter` specializations, `std::hash` support, and `std::ranges::enable_borrowed_range` opt-in. | A `string_view` that cannot dangle, whose pointee is a compile-time constant, and (in the `known_cstr` flavor) offers a guaranteed-valid `c_str()`. See [use cases 1](#use-case-1-c_str-without-copying-or-allocating), [2](#use-case-2-views-that-cannot-dangle) and [5](#use-case-5-formatting). |
 | `<ct_str/char_fold.hpp>` | `constexpr`, allocation-free ASCII case folding: `ascii_to_lower` / `ascii_to_upper` function objects and the lazy range adaptors `views::ascii_lower` / `views::ascii_upper`. | Case-insensitive machinery you can use standalone — as projections, in your own algorithms — with zero allocation. See [use case 6](#use-case-6-lazy-ascii-case-folding-views). |
-| `<ct_str/ctsv_comparators.hpp>` | Transparent, `noexcept`, `constexpr`-friendly comparators and hashers (`ctsv_less`, `ctsv_equal_to`, `ctsv_three_way`, `ctsv_hash`, plus `_ci_` case-insensitive variants) and the concepts that specify them. | Correct heterogeneous comparison across `basic_ct_string_view`, `std::basic_string_view`, `basic_fixed_string`, `std::basic_string` and literals; a `constexpr` hash `std::hash` cannot give you. See [use case 4](#use-case-4-associative-containers--case-insensitive-lookup). |
-| `<ct_str/ctsv_containers.hpp>` | `map` / `set` / `unordered_map` / `unordered_set` wrappers keyed on `basic_ct_string_view`, with an enforced insert/lookup asymmetry and the non-throwing `at_if`. | Containers whose keys *provably* outlive them, yet can be looked up with any string-ish type — including `at` and `erase`, which the standard library does not make heterogeneous. See [use case 4](#use-case-4-associative-containers--case-insensitive-lookup). |
+| `<ct_str/ctsv_comparators.hpp>` | Transparent, `constexpr`-friendly comparators and hashers with `noexcept` conditional on argument conversions (`ctsv_less`, `ctsv_equal_to`, `ctsv_three_way`, `ctsv_hash`, plus `_ci_` case-insensitive variants) and the concepts that specify them. | Correct heterogeneous comparison across `basic_ct_string_view`, `std::basic_string_view`, `basic_fixed_string`, `std::basic_string` and literals; a `constexpr` hash `std::hash` cannot give you. See [use case 4](#use-case-4-associative-containers--case-insensitive-lookup). |
+| `<ct_str/ctsv_containers.hpp>` | `map` / `set` / `unordered_map` / `unordered_set` wrappers keyed on `basic_ct_string_view`, with an enforced insert/lookup asymmetry and the non-throwing `at_if`. | Containers whose keys *provably* outlive them, yet can be looked up with any string-ish type — including `at` and `erase`, whose standard heterogeneous overloads require later language versions than C++20. See [use case 4](#use-case-4-associative-containers--case-insensitive-lookup). |
 | `<ct_str/ctsv_format_registration.hpp>` | Opt-in variable templates that synthesize `operator<<` for any type that is `std::format`- or `fmt::format`-able but not stream-insertable. | Write one `formatter` specialization and get iostreams support for free — no boilerplate `operator<<`. See [use case 7](#use-case-7-opt-in-stream-insertion-for-formattable-types). |
 
 ---
@@ -188,7 +190,7 @@ The other operand may be on either side, and `==`, `!=`, `<`, `<=`, `>`, `>=`
 and `<=>` all work. Every one of these comparisons is `noexcept`, whichever
 standard library you use. Strings of another character type, and `nullptr`, do
 not compile. As with `std::basic_string_view`, a pointer must not be null, and
-an array or a pointer must be null-terminated.
+an array or the character sequence a pointer addresses must be null-terminated.
 
 Convenience aliases:
 
@@ -268,7 +270,7 @@ auto good() -> cps::ct_string::ct_cstring_view {
 }
 ```
 
-`basic_ct_string_view`'s only public constructors are:
+Apart from its default constructor, `basic_ct_string_view`'s public constructors are:
 
 - the same-type / cross-flavor copy/move constructors,
 - a `consteval` factory path (`_ctsv`, `make_ctsv`, `basic_ct_sv_factory`)
@@ -397,7 +399,7 @@ generic programming over compile-time-built strings.
 
 ```c++
 template<basic_fixed_string Greeting>
-auto get_greeting() {
+constexpr auto get_greeting() {
     return cps::ct_string::make_ctsv<Greeting>();   // ct_cstring_view
 }
 
@@ -429,13 +431,19 @@ heterogeneous-lookup support is conspicuously incomplete:
 
 | Operation | Heterogeneous in the standard? |
 |---|---|
-| `find`, `contains`, `count`, `lower_bound`, `equal_range` | yes (C++14 ordered / C++20 unordered) |
-| `erase(key)` | only since C++23, under awkward constraints |
-| **`at(key)`** | **no -- takes `const key_type&`, full stop** |
-| `operator[]` | no (and correctly so: it *inserts*) |
+| `find`, `count`, `equal_range` | C++14 ordered / C++20 unordered |
+| `lower_bound`, `upper_bound` | C++14 ordered; absent from unordered containers |
+| `contains` | C++20 ordered and unordered |
+| `erase(key)` | C++23 ordered and unordered, with operation-specific constraints |
+| **`at(key)`** | **no in C++20/C++23 -- takes `const key_type&`** |
+| `operator[]` | no in C++20/C++23; it can insert |
 
-So the single most-reached-for operation -- "look this string up and give me
-the value" -- was the one that did not compile.
+These heterogeneous operations require transparent comparators and, for unordered
+containers, transparent hashers too. C++26 adds heterogeneous `at` and
+`operator[]` overloads; this library supports C++20.
+
+So in C++20/C++23 the single most-reached-for operation -- "look this string up
+and give me the value" -- was the one that did not compile.
 
 ### The fix: wrapper containers with an enforced insert/lookup asymmetry
 
@@ -444,12 +452,12 @@ distinction in the type system:
 
 - **Inserting** (`operator[]`, `insert`, `emplace`, `try_emplace`, ...)
   requires a real `basic_ct_string_view`. Nothing else can produce a key, so
-  the container can never hold a key whose storage it does not outlive.
+  the key's storage is guaranteed to outlive the container.
 - **Looking up** (`at`, `at_if`, `find`, `contains`, `count`, `erase`,
   `lower_bound`, ...) takes the `std::basic_string_view` **by value**. Every
   `basic_ct_string_view` (either flavor), `std::basic_string`,
-  `basic_fixed_string` and string literal converts implicitly. `nullptr`, and
-  a literal `0`, do not compile.
+  `basic_fixed_string` and string literal converts implicitly. Directly supplied
+  `nullptr` and literal `0` arguments are rejected at compile time.
 
 ```c++
 #include <ct_str/ctsv_containers.hpp>
@@ -536,8 +544,8 @@ Four things are worth knowing:
    testing, so these are FNV-1a over code units. If you need the standard
    library's hash instead, pass `std::hash<basic_ct_string_view<TChar, B>>`
    explicitly -- it is transparent and pairs correctly with `std::equal_to<>`.
-4. **`nullptr` is never a key.** Passing `nullptr` to any of these function
-   objects, to `std::hash<basic_ct_string_view<TChar, B>>`, or to a container's
+4. **`nullptr` is never a key.** Passing `nullptr` directly to any of these
+   function objects, to `std::hash<basic_ct_string_view<TChar, B>>`, or to a container's
    lookup does not compile, whatever the standard library or language version.
    In C++20, `std::basic_string_view` itself still converts from `nullptr`, and
    the call would have undefined behaviour.
@@ -653,10 +661,15 @@ bool same = std::ranges::equal(views::ascii_lower("Hello"_ctsv),
                                views::ascii_lower("hELLO"_ctsv));   // true
 ```
 
-Because both `std::basic_string_view` and `basic_ct_string_view` are borrowed
-ranges, the adapted views never dangle when built from them. Folding is
-ASCII-only by design (see [ASCII only](#ascii-only)); every non-ASCII code
-unit passes through unchanged, which keeps the transformation safe for
+Every flavor of `basic_ct_string_view` is guaranteed not to dangle by its
+construction and storage invariants. Folding views built from it use the same
+static character storage. Those built from `std::basic_string_view` still require
+the underlying characters to remain valid. Participation in `borrowed_range`
+does not extend character-storage lifetime; `transform_view` iterators also
+require the transform-view object to remain alive while they are used.
+
+Folding is ASCII-only by design (see [ASCII only](#ascii-only)); every non-ASCII
+code unit passes through unchanged, which keeps the transformation safe for
 UTF-8/16/32 data.
 
 ---
@@ -710,7 +723,7 @@ static `known_cstr` member), giving two distinct types:
 |---|---|---|
 | `c_str()` | available, returns a guaranteed-null-terminated pointer | not available (deleted by `requires`) |
 | `data()`  | available, == `c_str()` | available, no null-termination guarantee |
-| Default ctor | empty view pointing at static `'\0'` (`c_str()[0] == '\0'`) | empty view, `data()` unspecified |
+| Default ctor | empty view pointing at static `'\0'` (`c_str()[0] == '\0'`) | empty view, `data() == nullptr` |
 | `remove_prefix(n)` | OK (does not move the end pointer) | OK |
 | `remove_suffix(n)` | **disabled** (would invalidate null-termination) | OK |
 | `substr(pos)` (trailing) | returns same flavor (preserves guarantee) | returns same flavor |
@@ -837,7 +850,13 @@ R"(     THIS is the forest primeval. The murmuring pines and the hemlocks,
 ```
 ### Usage alternative 2: declare in header, define in .cpp file with `constinit`
 
-If you decide that a large, widely-included header file is slowing down compilation noticeably, you can declare the variables in the header but define them with constinit in the translation unit.  Note that constinit will only be applied in the definition, not in the header. Also, constinit does *NOT* imply const.  We want these to be global constants (presumably) so ensure they are marked const both at declaration and definition.  We are using constinit here **not** to have mutable views, but solely to segregate header declaration from translation unit definition. 
+If a large, widely included header noticeably slows compilation, declare the
+variables in the header and define them in a translation unit. In this example,
+`constinit` appears only on the definitions; it may also appear on declarations.
+It enforces static initialization and implies neither `const` nor `constexpr`.
+For global constants, write `const` on both declarations and definitions. The
+separate definitions move instantiation work out of the header; `constinit`
+ensures that initialization is not deferred to runtime.
 
 In a project with a large number of protobufs included in headers, I suspect the difference in compilation time will be noise.  If a project is adopting effective techniques to minimize compile time, e.g. by heavy usage of PImpl, this may be the best option. Otherwise, just defining them in the header file should be the shortest path to success.
 
@@ -992,7 +1011,10 @@ implicit conversion to std string    explicit (allocates)
 
 ## Building & integrating
 
-The library is header-only.
+The library is header-only. Including its headers manually requires C++20 and
+no mandatory third-party library. The current CMake build always includes the
+tests and demo, even when used as a subproject, and requires CMake 4.0.2 or
+later, fmt, GoogleTest, and a C++23-capable toolchain.
 
 ### CMake (FetchContent)
 
@@ -1000,7 +1022,7 @@ The library is header-only.
 include(FetchContent)
 FetchContent_Declare(
     cstr_view
-    GIT_REPOSITORY https://github.com/<your-org>/cstr_view.git
+    GIT_REPOSITORY https://github.com/cpsusie/ct_string.git
     GIT_TAG        main
 )
 FetchContent_MakeAvailable(cstr_view)
@@ -1055,10 +1077,10 @@ every public header and instantiates the templates. A second
 ([`tests/cxx20_comparison_checks.cpp`](tests/cxx20_comparison_checks.cpp)) is
 made only of compile-time checks: what the two class templates compare with,
 and what they must not. It also checks that no comparator, hasher or
-container lookup takes `nullptr`. A C++23-only construct landing in
-`inc/ct_str`, or a
-comparison that one standard library rejects, therefore breaks that target
-immediately instead of only breaking downstream users on older toolchains.
+container lookup directly takes `nullptr`. A C++23-only construct landing in
+`inc/ct_str`, or a comparison rejected by the standard library used for that
+build, therefore breaks that target immediately instead of only breaking
+downstream users on older toolchains.
 
 ---
 
