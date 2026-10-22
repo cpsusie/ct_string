@@ -97,7 +97,7 @@ Haec fides etiam transit nec quidquam executionis tempore constat. Prospectus du
 
 `basic_ct_string_view` utrumque tollit:
 
-1. Species `VALID_CSTR == true`, quae etiam **`known_cstr`** dicitur, `c_str()` praebet; inde `const TChar*` revera nullo charactere terminatus redditur. Nec exemplar, nec memoria, nec `strlen`.
+1. Species `VALID_CSTR == true`, quae etiam **`known_cstr`** dicitur, `c_str()` praebet; inde index `const TChar*` ad seriem nullo charactere certo terminatam redditur. Nec exemplar, nec memoria, nec `strlen`.
 
 2. Omnis `basic_ct_string_view` aut ex datis tempore compositionis notis (`basic_fixed_string` NTTP aut fabrica propria), aut ex alio `basic_ct_string_view`, efficitur. Characteres igitur semper per totum programma manent; prospectus pendere non potest.
 
@@ -476,7 +476,7 @@ consistent_ctsv_hash_equal<THash, TEq, TChar>
 
 Singuli constructionem default sine exceptione, `is_transparent`, atque rectum `noexcept` usum in omni coniunctione `{cstr view, non-cstr view, std::basic_string_view}` utroque ordine exigunt. `std::less<>` et `std::equal_to<>` satisfaciunt; `std::less<std::string_view>` non, quia transparens non est.
 
-`consistent_ctsv_hash_equal` praecipue curandum. In receptaculo inordinato claves aequales eundem hash habere debent. Aequalitatem casum neglegentem cum hash casum servantem iungere conditionem tacite frangeret: `"Ace"` et `"ACE"` simul condi possent, quamquam aequalia referrentur. `requires` hoc compositionis tempore recusat. Participatio per `ctsv_folds_case` indicatur, quod initio `false` est; ita genera externa ut `std::hash` et `std::equal_to<>` inter se recte coniunguntur.
+`consistent_ctsv_hash_equal` praecipue curandum. In receptaculo inordinato claves aequales eundem hash habere debent. Aequalitatem casum neglegentem cum functione hash casum servante iungere conditionem tacite frangeret: `"Ace"` et `"ACE"` simul condi possent, quamquam aequalia referrentur. `requires` hoc compositionis tempore recusat. Participatio per `ctsv_folds_case` indicatur, quod initio `false` est; ita genera externa ut `std::hash` et `std::equal_to<>` inter se recte coniunguntur.
 
 ### Ex nominibus veteribus migrandum
 
@@ -543,10 +543,11 @@ Conversio consulto ASCII tantum est; ceterae unitates intactae transeunt. UTF-8/
 
 `<ct_str/ctsv_format_registration.hpp>` molestiam communem tollit. Si `std::formatter` vel `fmt::formatter` iam scriptus est, saepe idem genus etiam per `operator<<` mittendum est; aliter eadem ratio iterum scribitur.
 
-Satis est unam formam variabilem specializare; `operator<<`, condicionibus restrictus atque per ADL inventus, efficitur:
+Forma variabili semel specializata, `operator<<` condicionibus restrictus praebetur. Si genus extra `cps::ct_string` definitum est, sola adscriptio non efficit ut operator per ADL inveniatur; eius nomen in locum vocationis per declarationem `using` inferatur:
 
 ```c++
 #include <ct_str/ctsv_format_registration.hpp>
+#include <iostream>
 
 // my_type already has a std::formatter specialization ...
 namespace cps::ct_string
@@ -555,16 +556,17 @@ namespace cps::ct_string
     inline constexpr bool g_k_stream_insert_via_std_format<my_type> = true;
 }
 
-// ... and now this just works:
+// Make the operator visible where the insertion is written:
+using cps::ct_string::operator<<;
 std::cout << my_type{/*...*/} << '\n';
 ```
 
-Quattuor puncta sunt: `g_k_stream_insert_via_std_format`, `g_k_stream_insert_via_fmt_format`, `g_k_wide_stream_insert_via_std_format`, `g_k_wide_stream_insert_via_fmt_format`.
+Quattuor puncta adscriptionis sunt: `g_k_stream_insert_via_std_format`, `g_k_stream_insert_via_fmt_format`, `g_k_wide_stream_insert_via_std_format`, `g_k_wide_stream_insert_via_fmt_format`. Rivi characterum `char` et `wchar_t` separatim tractantur.
 
-Regulae conceptibus coguntur:
+In utroque rivorum genere haec separatim servanda sunt:
 
-- genus iam rivo inseribile adscribi non potest, ne ambiguitas aut mutatio tacita fiat;
-- idem genus simul `std::format` et `fmt::format` eligere non potest.
+- genus iam rivo inseribile adscribi non debet, ne ambiguitas aut mutatio tacita fiat; haec cautio usori relinquitur;
+- idem genus simul per `std::format` et `fmt::format` adscribi non potest; hoc conceptibus prohibetur.
 
 Exemplum plenum in `fmt_reg_demo.hpp` / `.cpp`, intra `test_console_app`, invenitur.
 
@@ -576,7 +578,7 @@ Exemplum plenum in `fmt_reg_demo.hpp` / `.cpp`, intra `test_console_app`, inveni
 
 | Proprietas | `known_cstr == true` (`ct_cstring_view`, …) | `known_cstr == false` (`ct_string_view`, …) |
 |---|---|---|
-| `c_str()` | adest; indicem nullo charactere certo terminatum reddit | abest |
+| `c_str()` | adest; indicem ad seriem nullo charactere certo terminatam reddit | abest |
 | `data()` | adest; idem ac `c_str()` | adest; terminatio incerta |
 | Constructor default | prospectus vacuus ad staticum `'\0'` | prospectus vacuus; `data() == nullptr` |
 | `remove_prefix(n)` | licet | licet |
@@ -824,7 +826,7 @@ implicit conversion to std string    explicit (allocates)
 
 ## Aedificatio et coniunctio
 
-Bibliotheca solis capitibus constat. Ad capita manu includenda C++20 sufficit; nulla bibliotheca externa requiritur. Apparatui CMake versione CMake 3.21 vel posteriore opus est. Tum demum, cum opus per se aedificatur, etiam probationes C++20, probationes C++23 et programma demonstrativum aedificat ([optiones aedificationis](#optiones-aedificationis)). Si in aliud opus per `FetchContent` aut `add_subdirectory` includitur, solam bibliothecam praebet, neque fmt neque GoogleTest requirit.
+Bibliotheca solis capitibus constat. Ad capita manu includenda C++20 sufficit; nulla bibliotheca externa requiritur. Apparatui CMake versione 3.21 vel posteriore opus est. Nisi usor [optiones aedificationis](#optiones-aedificationis) mutavit, apparatus, cum opus per se aedificatur, probationes C++20, probationes C++23 et programma demonstrativum quoque aedificat; in aliud opus per `FetchContent` aut `add_subdirectory` inclusus, solam bibliothecam praebet, neque fmt neque GoogleTest requirit.
 
 ### CMake (`FetchContent`)
 
@@ -840,7 +842,7 @@ FetchContent_MakeAvailable(ct_string)
 target_link_libraries(my_target PRIVATE ct_string::ct_string)
 ```
 
-Ante primam editionem publicam apparatus CMake hic descriptus in solo ramo `develop-release_1` exstat. Postquam editio nota (`tag`) insignita erit, `GIT_TAG` eam notam nominet.
+Ante primam editionem publicam apparatus CMake hic descriptus in solo ramo `develop-release_1` exstat. Editione nota (`tag`) insignita, eadem nota in `GIT_TAG` ponatur.
 
 ### CMake (`subdirectory`)
 
@@ -849,7 +851,7 @@ add_subdirectory(third_party/ct_string)
 target_link_libraries(my_target PRIVATE ct_string::ct_string)
 ```
 
-Propositum aedificationis olim `cstr_view` appellabatur. Id nomen etiamnunc valet: est nomen alterum propositi `ct_string::ct_string`.
+Propositum aedificationis olim `cstr_view` appellabatur. Id nomen manet: idem propositum significat ac `ct_string::ct_string`.
 
 ### Manu
 
@@ -867,7 +869,7 @@ Caput `<ct_str/ct_string_view.hpp>` capita fmt per `__has_include` deprehendit s
 
 ### Optiones aedificationis
 
-Quaeque optio `ON` est, cum opus per se aedificatur, `OFF`, cum in aliud includitur. Utroque modo `-D` eam mutat.
+Nisi usor aliter constituit, quaeque optio `ON` est, cum opus per se aedificatur, `OFF`, cum in aliud includitur. Utroque modo per `-D` mutari potest.
 
 | Optio | Quid aedificet | Quid requirat |
 |---|---|---|
@@ -875,20 +877,20 @@ Quaeque optio `ON` est, cum opus per se aedificatur, `OFF`, cum in aliud includi
 | `CT_STRING_BUILD_TESTS` | `cstr_view_tests`, probationes C++23 | C++23, GoogleTest et fmt |
 | `CT_STRING_BUILD_EXAMPLES` | `test_console_app`, programma demonstrativum | C++23 et fmt |
 
-fmt et GoogleTest propter eas tantum optiones quaeruntur quae eis egent. Ad instrumentum probandum cui C++23 deest, velut GCC 11, solae probationes C++20 aedificentur:
+Quae bibliothecae externae quaerantur, ex optionibus electis pendet. Ad instrumentum probandum cui C++23 deest, velut GCC 11, solae probationes C++20 aedificentur:
 
 ```bash
 cmake -S . -B build -DCT_STRING_BUILD_TESTS=OFF -DCT_STRING_BUILD_EXAMPLES=OFF
 cmake --build build
 ```
 
-Tum probationes C++20, si fmt non adest, sine eo aedificantur. Si adest, caput id sua sponte invenit (vide supra), sive CMake id coniungit sive non.
+Tum probationes C++20, si fmt non adest, sine eo aedificantur. Capitibus autem fmt in via capitum positis, caput bibliothecae ea sua sponte invenit atque includit (vide supra), sive CMake fmt coniungit sive non.
 
-Opus nullis modulis C++ utitur. Itaque perscrutationem modulorum, quam CMake a versione 3.28 adhibet, in suis propositis aedificationis exstinguit; quare Clang `clang-scan-deps` non requirit.
+Opus modulis C++ non utitur. Inquisitione igitur modulorum, quam CMake a versione 3.28 adhibet, in propositis aedificationis huius operis omissa, Clang `clang-scan-deps` non requirit.
 
 ### Praescripta CMake (`presets`)
 
-`CMakePresets.json` praescripta ad parandum, ad aedificandum, ad probandum continet, quorum nomina inter se congruunt. Singula Ninja utuntur atque in `build/<preset>` aedificant:
+`CMakePresets.json` praescripta ad opus parandum, aedificandum, probandum continet, quorum nomina inter se congruunt. Omnia, Ninja adhibito, directorio `build/<preset>` utuntur:
 
 | Praescripta | Instrumentum | Systema |
 |---|---|---|
@@ -903,7 +905,7 @@ cmake --build --preset gcc-debug
 ctest --preset gcc-debug
 ```
 
-Ad certam instrumenti versionem adhibendam, cum opus paratur, instrumentum mutetur: `cmake --preset gcc-debug -D CMAKE_CXX_COMPILER=g++-14`. Praescripta MSVC et clang-cl ex x64 Developer Command Prompt aut Developer PowerShell adhibeantur; Visual Studio eum ambitum ipse parat. Praescriptum probandi deficit, si nulla probatio aedificata est. Praescriptis CMake 3.21 sufficit. Praescripta privata in `CMakeUserPresets.json` ponantur, quod Git neglegit.
+Ad certam instrumenti versionem adhibendam, dum opus paratur, `CMAKE_CXX_COMPILER` mutetur: `cmake --preset gcc-debug -D CMAKE_CXX_COMPILER=g++-14`. Praescripta MSVC et clang-cl ex x64 Developer Command Prompt aut Developer PowerShell adhibeantur; ambitum autem Visual Studio sua sponte parat. Praescripto probandi adhibito, si nullae probationes reperiuntur, error nuntiatur. Praescriptis CMake 3.21 sufficit. Praescripta privata in `CMakeUserPresets.json` ponantur, quem fasciculum Git neglegit.
 
 ### Probationes
 
@@ -913,7 +915,7 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-Si probationes aedificantur, GoogleTest per `find_package(GTest CONFIG REQUIRED)` invenitur, fmt per `find_package(fmt CONFIG REQUIRED)`.
+Probationibus electis, GoogleTest per `find_package(GTest CONFIG REQUIRED)` quaeritur, fmt per `find_package(fmt CONFIG REQUIRED)`; utraque bibliotheca requiritur.
 
 ### Norma linguae: bibliotheca et probationes
 
@@ -923,7 +925,7 @@ Si probationes aedificantur, GoogleTest per `find_package(GTest CONFIG REQUIRED)
 target_compile_features(ct_string INTERFACE cxx_std_20)
 ```
 
-**Probationes et programma demonstrativum C++23 sunt** — hoc `std::expected` utitur — atque singulis propositis aedificationis:
+**Probationes et programma demonstrativum C++23 requirunt** — hoc `std::expected` utitur — atque haec norma singulis propositis aedificationis per:
 
 ```cmake
 target_compile_features(... PRIVATE cxx_std_23)

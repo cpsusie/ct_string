@@ -681,11 +681,14 @@ written a `std::formatter` (or `fmt::formatter`) specialization for your
 type, and now you *also* want `operator<<` for iostreams -- more boilerplate
 that just forwards to the formatter.
 
-Instead, register the type once by specializing a variable template, and a
-constrained, ADL-found `operator<<` is synthesized for you:
+Register the type once by specializing a variable template to enable a
+constrained `operator<<`. For a type defined outside `cps::ct_string`,
+registration alone does not make ADL find the operator; bring it into scope
+where the insertion is written:
 
 ```c++
 #include <ct_str/ctsv_format_registration.hpp>
+#include <iostream>
 
 // my_type already has a std::formatter specialization ...
 namespace cps::ct_string
@@ -694,7 +697,8 @@ namespace cps::ct_string
     inline constexpr bool g_k_stream_insert_via_std_format<my_type> = true;
 }
 
-// ... and now this just works:
+// Make the operator visible where the insertion is written:
+using cps::ct_string::operator<<;
 std::cout << my_type{/*...*/} << '\n';
 ```
 
@@ -703,12 +707,13 @@ streams for both formatting libraries: `g_k_stream_insert_via_std_format`,
 `g_k_stream_insert_via_fmt_format`, `g_k_wide_stream_insert_via_std_format`
 and `g_k_wide_stream_insert_via_fmt_format`.
 
-The rules are enforced by concepts rather than merely documented:
+Observe these rules independently for narrow and wide streams:
 
-- a type that is *already* stream-insertable cannot be registered (that would
-  create an ambiguity or silently switch operators), and
-- a type cannot be registered for both `std::format` and `fmt::format` at
-  once -- pick one.
+- do not register a type that is *already* insertable into that kind of stream:
+  this may create an ambiguity or silently switch operators. The caller must
+  observe this restriction; the registration concepts do not enforce it;
+- for a given stream width, a type cannot be registered for both `std::format`
+  and `fmt::format` at once; the concepts reject that combination.
 
 A worked example lives in `fmt_reg_demo.hpp` / `.cpp` in `test_console_app`.
 
@@ -1012,11 +1017,11 @@ implicit conversion to std string    explicit (allocates)
 ## Building & integrating
 
 The library is header-only. Including its headers manually requires C++20 and
-no third-party library. The CMake project requires CMake 3.21 or later. Only
-when it is the top-level project does it also build the C++20 checks, the
-C++23 tests and the demo ([build options](#build-options)). Included in
-another project, with `FetchContent` or `add_subdirectory`, it provides the
-library alone, and needs neither fmt nor GoogleTest.
+no third-party library. The CMake project requires CMake 3.21 or later.
+Unless the user overrides the [build options](#build-options), it builds the
+C++20 checks, the C++23 tests and the demo when it is the top-level project;
+included in another project with `FetchContent` or `add_subdirectory`, it
+provides the library alone and needs neither fmt nor GoogleTest.
 
 ### CMake (FetchContent)
 
@@ -1061,8 +1066,8 @@ required from the user.
 
 ### Build options
 
-Each option is `ON` when this is the top-level project, and `OFF` when it is
-included in another. Either way, `-D` overrides it.
+Each option defaults to `ON` when this is the top-level project, and `OFF`
+when it is included in another. Either way, `-D` overrides it.
 
 | Option | Builds | Requires |
 |---|---|---|
@@ -1070,17 +1075,17 @@ included in another. Either way, `-D` overrides it.
 | `CT_STRING_BUILD_TESTS` | `cstr_view_tests`, the test suite | C++23, GoogleTest and fmt |
 | `CT_STRING_BUILD_EXAMPLES` | `test_console_app`, the demo | C++23 and fmt |
 
-fmt and GoogleTest are looked up only for the options that need them. To check
-a compiler that has no C++23, such as GCC 11, build the C++20 checks alone:
+Which third-party libraries are looked up depends on the selected options.
+To check a compiler that has no C++23, such as GCC 11, build the C++20 checks alone:
 
 ```bash
 cmake -S . -B build -DCT_STRING_BUILD_TESTS=OFF -DCT_STRING_BUILD_EXAMPLES=OFF
 cmake --build build
 ```
 
-The C++20 checks then build without fmt if fmt is not installed. If it is
-installed, the header finds it on its own (see above), whether CMake links it
-or not.
+The C++20 checks then build without fmt if fmt is not installed. If fmt's
+headers are on the compiler's include path, the library header finds and
+includes them on its own (see above), whether CMake links fmt or not.
 
 The project uses no C++ modules. It turns off CMake's module scanning (CMake
 3.28 and later) for its own targets, so Clang does not need `clang-scan-deps`.
@@ -1106,9 +1111,9 @@ ctest --preset gcc-debug
 To use a particular compiler version, override the compiler when configuring:
 `cmake --preset gcc-debug -D CMAKE_CXX_COMPILER=g++-14`. Run the MSVC and
 clang-cl presets from an x64 Developer Command Prompt or Developer PowerShell;
-Visual Studio sets that environment up itself. A test preset fails if no test
-was built. The presets need only CMake 3.21. Personal presets belong in
-`CMakeUserPresets.json`, which Git ignores.
+Visual Studio sets that environment up itself. A test preset reports an error
+if no tests are found. The presets need only CMake 3.21. Personal presets
+belong in `CMakeUserPresets.json`, which Git ignores.
 
 ### Running the tests
 
