@@ -824,28 +824,32 @@ implicit conversion to std string    explicit (allocates)
 
 ## Aedificatio et coniunctio
 
-Bibliotheca solis capitibus constat. Ad capita manu includenda C++20 sufficit; nulla bibliotheca externa necessario requiritur. Apparatus CMake autem, qui probationes et programma demonstrativum semper aedificat, etiam cum in alio opere includitur, CMake 4.0.2 vel posterius, fmt, GoogleTest atque instrumentum C++23 requirit.
+Bibliotheca solis capitibus constat. Ad capita manu includenda C++20 sufficit; nulla bibliotheca externa requiritur. Apparatui CMake versione CMake 3.21 vel posteriore opus est. Tum demum, cum opus per se aedificatur, etiam probationes C++20, probationes C++23 et programma demonstrativum aedificat ([optiones aedificationis](#optiones-aedificationis)). Si in aliud opus per `FetchContent` aut `add_subdirectory` includitur, solam bibliothecam praebet, neque fmt neque GoogleTest requirit.
 
 ### CMake (`FetchContent`)
 
 ```cmake
 include(FetchContent)
 FetchContent_Declare(
-    cstr_view
+    ct_string
     GIT_REPOSITORY https://github.com/cpsusie/ct_string.git
-    GIT_TAG        main
+    GIT_TAG        develop-release_1
 )
-FetchContent_MakeAvailable(cstr_view)
+FetchContent_MakeAvailable(ct_string)
 
-target_link_libraries(my_target PRIVATE cstr_view)
+target_link_libraries(my_target PRIVATE ct_string::ct_string)
 ```
+
+Ante primam editionem publicam apparatus CMake hic descriptus in solo ramo `develop-release_1` exstat. Postquam editio nota (`tag`) insignita erit, `GIT_TAG` eam notam nominet.
 
 ### CMake (`subdirectory`)
 
 ```cmake
-add_subdirectory(third_party/cstr_view)
-target_link_libraries(my_target PRIVATE cstr_view)
+add_subdirectory(third_party/ct_string)
+target_link_libraries(my_target PRIVATE ct_string::ct_string)
 ```
+
+Propositum aedificationis olim `cstr_view` appellabatur. Id nomen etiamnunc valet: est nomen alterum propositi `ct_string::ct_string`.
 
 ### Manu
 
@@ -861,6 +865,46 @@ quod `<ct_str/fixed_string.hpp>` quoque includit.
 
 Caput `<ct_str/ct_string_view.hpp>` capita fmt per `__has_include` deprehendit suaque sponte includit. Ad speciem `char` `basic_ct_string_view` per `fmt::formatter` formatandam `<fmt/format.h>` requiritur; ad speciem `wchar_t`, etiam `<fmt/xchar.h>`. Cetera in [Usu V](#usus-v-formatio).
 
+### Optiones aedificationis
+
+Quaeque optio `ON` est, cum opus per se aedificatur, `OFF`, cum in aliud includitur. Utroque modo `-D` eam mutat.
+
+| Optio | Quid aedificet | Quid requirat |
+|---|---|---|
+| `CT_STRING_BUILD_CXX20_CHECKS` | `cstr_view_cxx20_smoke`, probationes C++20 ([infra](#norma-linguae-bibliotheca-et-probationes)) | C++20; fmt adhibet, si CMake id invenit |
+| `CT_STRING_BUILD_TESTS` | `cstr_view_tests`, probationes C++23 | C++23, GoogleTest et fmt |
+| `CT_STRING_BUILD_EXAMPLES` | `test_console_app`, programma demonstrativum | C++23 et fmt |
+
+fmt et GoogleTest propter eas tantum optiones quaeruntur quae eis egent. Ad instrumentum probandum cui C++23 deest, velut GCC 11, solae probationes C++20 aedificentur:
+
+```bash
+cmake -S . -B build -DCT_STRING_BUILD_TESTS=OFF -DCT_STRING_BUILD_EXAMPLES=OFF
+cmake --build build
+```
+
+Tum probationes C++20, si fmt non adest, sine eo aedificantur. Si adest, caput id sua sponte invenit (vide supra), sive CMake id coniungit sive non.
+
+Opus nullis modulis C++ utitur. Itaque perscrutationem modulorum, quam CMake a versione 3.28 adhibet, in suis propositis aedificationis exstinguit; quare Clang `clang-scan-deps` non requirit.
+
+### Praescripta CMake (`presets`)
+
+`CMakePresets.json` praescripta ad parandum, ad aedificandum, ad probandum continet, quorum nomina inter se congruunt. Singula Ninja utuntur atque in `build/<preset>` aedificant:
+
+| Praescripta | Instrumentum | Systema |
+|---|---|---|
+| `gcc-debug`, `gcc-release` | `g++` | quodvis praeter Windows |
+| `clang-debug`, `clang-release` | `clang++` | quodvis praeter Windows |
+| `msvc-debug`, `msvc-release` | `cl` | Windows, ambitu x64 parato |
+| `clang-cl-debug`, `clang-cl-release` | `clang-cl` | Windows, ambitu x64 parato |
+
+```bash
+cmake --preset gcc-debug
+cmake --build --preset gcc-debug
+ctest --preset gcc-debug
+```
+
+Ad certam instrumenti versionem adhibendam, cum opus paratur, instrumentum mutetur: `cmake --preset gcc-debug -D CMAKE_CXX_COMPILER=g++-14`. Praescripta MSVC et clang-cl ex x64 Developer Command Prompt aut Developer PowerShell adhibeantur; Visual Studio eum ambitum ipse parat. Praescriptum probandi deficit, si nulla probatio aedificata est. Praescriptis CMake 3.21 sufficit. Praescripta privata in `CMakeUserPresets.json` ponantur, quod Git neglegit.
+
 ### Probationes
 
 ```bash
@@ -869,20 +913,14 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-GoogleTest adhibetur atque per:
-
-```cmake
-find_package(GTest CONFIG REQUIRED)
-```
-
-invenitur.
+Si probationes aedificantur, GoogleTest per `find_package(GTest CONFIG REQUIRED)` invenitur, fmt per `find_package(fmt CONFIG REQUIRED)`.
 
 ### Norma linguae: bibliotheca et probationes
 
-**Bibliotheca C++20 est.** Propositum aedificationis (`target`) `cstr_view` hanc normam minimam declarat per:
+**Bibliotheca C++20 est.** Propositum aedificationis (`target`) `ct_string` hanc normam minimam declarat per:
 
 ```cmake
-target_compile_features(cstr_view INTERFACE cxx_std_20)
+target_compile_features(ct_string INTERFACE cxx_std_20)
 ```
 
 **Probationes et programma demonstrativum C++23 sunt** — hoc `std::expected` utitur — atque singulis propositis aedificationis:
@@ -893,7 +931,7 @@ target_compile_features(... PRIVATE cxx_std_23)
 
 petitur; `CMAKE_CXX_STANDARD` totius operis non augetur.
 
-Ad hanc distinctionem servandam, apparatus aedificationis bibliothecam staticam `cstr_view_cxx20_smoke` complectitur, cui norma C++20 expresse imponitur. Una eius unitas translationis, [`tests/cxx20_header_smoke.cpp`](tests/cxx20_header_smoke.cpp), omnia capita publica includit formasque instantiat; altera, [`tests/cxx20_comparison_checks.cpp`](tests/cxx20_comparison_checks.cpp), solas probationes tempore compositionis peragendas continet. Hae explorant quibuscum duo genera conferantur, quibuscum non; confirmant etiam nullum comparatorem, nullam functionem hash, nullam inquisitionem receptaculi `nullptr` directe accipere. Si constructio quae C++23 requirit in `inc/ct_str` ingreditur, aut si qua comparatio a bibliotheca standard in qua probatur recusatur, huius bibliothecae aedificatio statim deficit; non exspectatur donec usor instrumento vetustiore laboret.
+Ad hanc distinctionem servandam, apparatus aedificationis bibliothecam staticam `cstr_view_cxx20_smoke` complectitur (optio `CT_STRING_BUILD_CXX20_CHECKS`), cui norma C++20 expresse imponitur. Neque GoogleTest neque instrumentum C++23 requirit. Una eius unitas translationis, [`tests/cxx20_header_smoke.cpp`](tests/cxx20_header_smoke.cpp), omnia capita publica includit formasque instantiat; altera, [`tests/cxx20_comparison_checks.cpp`](tests/cxx20_comparison_checks.cpp), solas probationes tempore compositionis peragendas continet. Hae explorant quibuscum duo genera conferantur, quibuscum non; confirmant etiam nullum comparatorem, nullam functionem hash, nullam inquisitionem receptaculi `nullptr` directe accipere. Si constructio quae C++23 requirit in `inc/ct_str` ingreditur, aut si qua comparatio a bibliotheca standard in qua probatur recusatur, huius bibliothecae aedificatio statim deficit; non exspectatur donec usor instrumento vetustiore laboret.
 
 ---
 
@@ -908,6 +946,7 @@ Ad hanc distinctionem servandam, apparatus aedificationis bibliothecam staticam 
 - In Linux/x86_64 verificatum cum **GCC 13**, GCC 14, Clang 19; bibliotheca C++20, probationes C++23.
 - GCC 13 terminus inferior consulto est: eius libstdc++ `std::ranges::to` (P1206R7) nondum habet; quare neque bibliotheca neque probationes eo niti possunt.
 - Cum `fmtlib` et sine eo probatum.
+- CMake 3.21 vel posterius, si apparatu CMake uteris; ad capita manu includenda CMake non requiritur.
 - Praeter libstdc++ et bibliothecam STL MSVC, etiam **libc++ 17** et versiones posteriores adhiberi possunt. Hoc in instrumento locali Linux/x86_64 verificatum est, cum Clang 17 + libc++ 17 et cum Clang 20 + libc++ 20; cum posteriore etiam probationes C++23 succedunt. CI libc++ nondum probat.
 - `std::formatter`, si adhibetur, `<format>` requirit atque `__cpp_lib_format >= 201907L`. libc++ hanc macrodefinitionem a versione 19 demum definit; cum libc++ 17 et 18 igitur specialitas `std::formatter` huius bibliothecae omittitur.
 - Membrum `contains`, si in bibliotheca standard praesto est, `string_view::contains` utitur (`__cpp_lib_string_contains >= 202011L`); aliter per `find` efficitur.

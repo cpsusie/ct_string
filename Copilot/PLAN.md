@@ -1,7 +1,8 @@
 # Development and release plan: `ct_string`
 
-> **Status:** T1 (PR #14) and T2 (PR #15) merged. M0 is done (retrospective in §10). T3 in review;
-> it closes M1 (retrospective in §10). T4 planned in full. **Last updated:** 2026-10-11.
+> **Status:** T1 (PR #14), T2 (PR #15) and T3 (PR #17) merged; M0 and M1 are done (retrospectives
+> in §10). You then corrected the docs (PR #18). T4 in review. T5 planned in full.
+> **Last updated:** 2026-10-18.
 > **Approver:** @cpsusie. **Author:** Copilot.
 > **Brief:** [develop-release-project.md](develop-release-project.md).
 > **Companion documents:**
@@ -278,7 +279,7 @@ my standard library" is not the same as standard C++.
   - The library headers are unchanged.
   - After merging it, you refined the Latin of the two fmt passages yourself (PR #16).
 
-#### T3: Make comparisons portable to libc++ (in review)
+#### T3: Make comparisons portable to libc++ (done: PR #17, merged 2026-10-18)
 - **Goal.** Comparisons between `basic_ct_string_view` or `basic_fixed_string` and string
   literals, arrays, pointers, `std::basic_string` and `std::basic_string_view` compile with
   **libc++ 17+**, as well as libstdc++ and the MSVC STL. Existing meaning and `noexcept` stay as
@@ -445,7 +446,7 @@ my standard library" is not the same as standard C++.
 *What you will learn:* CMake presets and options; GitHub Actions workflows, jobs, matrices,
 runners and containers; required status checks and rulesets; Dependabot; least-privilege tokens.
 
-#### T4: CMake hygiene (NEXT TASK, planned in full)
+#### T4: CMake hygiene (in review)
 - **Goal.** A consumer using `add_subdirectory` or `FetchContent` gets only the header-only
   library: no fmt, no GoogleTest, and CMake 3.21 or later. The project's own top-level build still
   builds and tests everything, now through options and presets (D-017, D-018, F-6, Q-01, Q-09).
@@ -515,36 +516,146 @@ runners and containers; required status checks and rulesets; Dependabot; least-p
   - Moving the suite and the demo into their own project (T10).
   - A switch that turns fmt on or off (T11).
   - CI (T5).
+- **Outcome.**
+  - **Answer.** Q-09: the default, CMake 3.21, which you accepted when T4 started (D-017).
+  - **Branch.** `copilot/ct-string-next-phase`, the name this Copilot session was given, instead of
+    `copilot/t4-cmake-hygiene`.
+  - **`CMakeLists.txt`.**
+    - `cmake_minimum_required(VERSION 3.21...4.4)`. 4.4.4 is the newest CMake on PyPI (D-017).
+    - The project and the INTERFACE target are `ct_string`, with the aliases
+      `ct_string::ct_string` and `cstr_view` (Q-01, D-019).
+    - `CT_STRING_BUILD_CXX20_CHECKS`, `CT_STRING_BUILD_TESTS` and `CT_STRING_BUILD_EXAMPLES`, each
+      defaulting to `PROJECT_IS_TOP_LEVEL` (D-033).
+    - fmt is required only by the suite and the demo, and GoogleTest only by the suite. The smoke
+      check links fmt when CMake finds it, and a status message says whether it did.
+    - With all three options off, the file stops right after defining the library (`return()`).
+      The plan did not say how a consumer's build would avoid the warnings target; this is the
+      simplest way (D-033).
+    - `CMAKE_CXX_SCAN_FOR_MODULES` is off.
+  - **`CMakePresets.json`.** Schema 3; `gcc`, `clang`, `msvc` and `clang-cl`, each `-debug` and
+    `-release`; matching build and test presets (D-034).
+  - **Verified**, all with `-Werror`:
+    - the default top-level build, with presets (`gcc-*` and `clang-*`, with
+      `-D CMAKE_CXX_COMPILER=g++-14` and `clang++-20`) and without (Unix Makefiles), with GCC 14
+      and Clang 20 (libstdc++), Debug and Release: the smoke check builds, all 176 tests pass,
+      and the demo exits with 0;
+    - CMake 3.21.4 and 4.4.4 (PyPI), GCC 14 and Ninja, with and without presets: the same;
+    - in an `ubuntu:24.04` container with neither fmt nor GoogleTest (GCC 13; CMake 3.28.3 and
+      3.21.4): all three options off configures and builds, and neither dependency appears in the
+      cache; the smoke check alone builds, "without fmt"; the default configure stops, asking for
+      fmt, as it should;
+    - in the same container, a scratch consumer using `add_subdirectory`, and one using
+      `FetchContent` (the README's snippet, with `FETCHCONTENT_SOURCE_DIR_CT_STRING` pointing at
+      the checkout), build and run against `ct_string::ct_string` and against `cstr_view`. Every
+      option is off there, and none of the project's own targets is built;
+    - in the official `gcc:11.1` container with CMake 3.21.4: the smoke check alone builds with
+      `-std=c++20`, without fmt and with fmt 9.1; the `add_subdirectory` consumer builds and runs;
+    - module scanning, simulated as planned with CMake 4.4.4: before T4, Clang 19 and Clang 20
+      fail to configure (F-15 says where); with T4, both configure and build, and all 176 tests
+      pass. With `clang-scan-deps` present, the build has no scanning rules any more (39 before);
+    - the MSVC and clang-cl presets: on Linux, a scratch copy whose condition names Linux is
+      listed and applied by CMake 3.21.4, `architecture` setting included. They have not run on
+      Windows; T7 will run them.
+  - **Docs.** README and LEGENDUM, in parallel: "Building & integrating" ("Aedificatio et
+    coniunctio") has the new target name, CMake 3.21, what a consumer gets, new sections "Build
+    options" ("Optiones aedificationis") and "CMake presets" ("Praescripta CMake"), and a note
+    on module scanning; "Running the tests" ("Probationes") says when fmt and GoogleTest are
+    looked up; "Language standard" ("Norma linguae") has the new target name and the option;
+    "Requirements" ("Quae requirantur") gains CMake 3.21.
+  - **Deviations from the plan.**
+    - The `FetchContent` example names `GIT_TAG develop-release_1`, not `main`: `main` still has
+      the old CMake project, which would make every consumer find fmt and GoogleTest. A sentence
+      says to use the release tag once there is one. T17 makes that change.
+    - "Requirements" was not in the plan's list of docs; it now names the CMake minimum.
+  - **Found on the way (F-15).** Where module scanning fails; how presets inherit conditions; the
+    demo needs the `en_US.UTF-8` locale and exits with 255 without it (T5 installs it; Q-15 notes
+    it); what the `ubuntu-24.04` runner provides, for T5.
 
-#### T5: CI skeleton and security baseline
-- **Scope.**
-  - `.github/workflows/ci.yml`:
-    - Triggers (phase 1, D-014): pushes to and PRs into `develop-release_1` and `main`; manual
-      runs; a weekly schedule. The last two work only from the default branch (F-12, Q-21).
-    - Read-only default permissions, concurrency control and job timeouts.
-    - Actions pinned to commit SHAs (D-012).
-  - Jobs on `ubuntu-24.04` with GCC 14, building through the presets:
-    - with Ubuntu's GoogleTest and fmt: the smoke check, the full suite and the demo;
-    - without fmt installed: the smoke check, confirming that fmt support is off. "Forced off
-      while fmt is present" comes with T11;
-    - the gate job `ci-ok`. It depends on every other job, always runs, and fails unless they all
-      succeeded (D-013).
-  - `.github/dependabot.yml`: GitHub Actions version updates as one grouped weekly PR into
-    `develop-release_1` (D-012, D-028).
-  - `.github/pull_request_template.md`, containing the §3.2 checklist.
-  - A CI badge in README and LEGENDUM.
-- **You:**
-  - create the two branch rulesets, both requiring `ci-ok`, and apply the Dependabot settings
-    (Q-16, accepted);
-  - make `develop-release_1` the default branch (Q-21, accepted: D-028).
-
-  The PR includes click-by-click steps for both.
-- **Done when:**
-  - the workflow is green on the PR's merge commit, and again on `develop-release_1` after merging;
-  - a job made to fail on a scratch branch turns `ci-ok` red;
-  - both rulesets require `ci-ok`;
-  - with the Q-21 setting applied, a manual run starts from the Actions tab and Dependabot reports a
-    successful check. Any feature that cannot work yet is listed in the PR, with the reason.
+#### T5: CI skeleton and security baseline (NEXT TASK, planned in full)
+- **Goal.** Every push to, and PR into, `develop-release_1` and `main` builds and tests the project
+  on Linux with GCC 14, and one check, `ci-ok`, reports the result. The workflow follows the
+  security baseline, and Dependabot keeps its action current (D-011 to D-014, D-016, D-028, Q-16,
+  Q-21).
+- **What planning found.** A throwaway prototype, not committed, on 2026-10-18 (F-15):
+  - **The runner has almost everything.** `ubuntu-24.04` has GCC 14.2 as `g++-14` (plain `g++` is
+    GCC 13), CMake 3.31.6 and Ninja 1.13.2. It has neither GoogleTest nor fmt; per D-016 they come
+    from Ubuntu's packages `libgtest-dev`, `libgmock-dev` and `libfmt-dev`.
+  - **T4's presets work unchanged.** In an `ubuntu:24.04` container with those packages,
+    `cmake --preset gcc-debug -D CMAKE_CXX_COMPILER=g++-14`, then the build and test presets of
+    the same name, pass in Debug and Release.
+  - **The demo needs the `en_US.UTF-8` locale.** Without it, the demo exits with 255; after
+    installing `locales` and generating the locale, it exits with 0. The job therefore generates
+    it, rather than relying on the runner image.
+  - **"Without fmt" needs no extra package work:** the runner has no fmt. With the suite and the
+    demo turned off, the configure output says the C++20 checks build "without fmt". The test
+    preset fails there on purpose, because no test is built (D-034), so that job does not run
+    `ctest`.
+  - **One action is enough.** Everything except the checkout is a shell step, so the only action
+    to pin is `actions/checkout`, v7.0.1 (commit `3d3c42e5…`). A draft workflow along the lines
+    below passes `actionlint` 1.7.12, with `shellcheck`.
+  - **Repository.** `main` is still the default branch, and the only protected one. No branch has
+    a `.github/` directory.
+- **Branch:** a new branch from `develop-release_1`, for example `copilot/t5-ci-skeleton`; the
+  Copilot session may name it differently.
+- **Questions:** Q-14 (a code formatter) is needed. If it is still open, T5 uses the default (no
+  formatter before 1.0, so no format check) and asks again in its PR. Q-16 and Q-21 are answered:
+  you apply them after merging.
+- **Steps.**
+  1. **`.github/workflows/ci.yml`, the frame.**
+     - Triggers (D-014, phase 1): pushes to, and PRs into, `develop-release_1` and `main`; manual
+       runs; a weekly schedule, at an odd minute so it does not start with everyone else's.
+     - `permissions: contents: read` for the whole workflow; no job asks for more (D-012).
+     - Concurrency: one group per PR or branch. A newer run of a PR cancels the older one; runs
+       for pushes and the schedule are never cancelled.
+     - Every job: `runs-on: ubuntu-24.04`, a timeout, `actions/checkout` pinned to the commit SHA
+       with a version comment and `persist-credentials: false`, and a step that prints the
+       versions of `g++-14`, CMake and Ninja (D-011).
+  2. **Jobs.**
+     - **GCC 14, Debug and Release** (a two-entry matrix, `fail-fast` off). Installs the three
+       library packages and `locales`, and generates `en_US.UTF-8`. Configures with the `gcc-*`
+       preset and `-D CMAKE_CXX_COMPILER=g++-14`; builds; runs the test preset (176 tests); runs
+       the demo. All three options are on by default, so this builds the smoke check, the suite
+       and the demo. D-029 makes the build fail if fmt goes missing from the suite.
+     - **GCC 14, C++20 checks without fmt.** Installs nothing. First fails if `g++-14` can find
+       `<fmt/format.h>`, so that a runner image that one day ships fmt cannot make this job
+       meaningless. Configures the `gcc-debug` preset with the suite and the demo off, checks that
+       the configure output says "without fmt", and builds.
+     - **`ci-ok`.** Needs every other job, always runs, and fails unless every one of them
+       succeeded; a skipped or cancelled job counts as a failure (D-013, F-12).
+  3. **`.github/dependabot.yml`.** GitHub Actions only, weekly, `target-branch: develop-release_1`,
+     with every update in one group, so they come as one PR (D-012, D-028).
+  4. **`.github/pull_request_template.md`.** The §3.2 checklist and the §3.3 headings.
+  5. **Docs**, in README and LEGENDUM together: a CI status badge for `develop-release_1` under
+     the title, and one sentence in "Requirements" ("Quae requirantur") saying what CI checks so
+     far (GCC 14 on Linux, with and without fmt); T6 widens it.
+  6. **Your settings.** The PR gives click-by-click steps, in this order:
+     1. merge the PR, and wait for the first run on `develop-release_1` (a ruleset can only
+        require a check that has already run);
+     2. make `develop-release_1` the default branch (Q-21, D-028);
+     3. in the merge settings, allow squash merges and merge commits, and turn on "Automatically
+        delete head branches" (Q-16);
+     4. look at what protects `main` today, and decide whether the new ruleset replaces it;
+     5. create the two rulesets of Q-16, both requiring `ci-ok`;
+     6. Dependabot: alerts on, automatic security-update PRs off (D-012);
+     7. start a manual run from the Actions tab, and check Dependabot's status page.
+  7. **Plan and decisions.** The job names and the gate, as a decision; this plan: status, and T6
+     in full.
+- **Definition of done.**
+  - `actionlint` passes on the workflow. It is run locally, and not added to the repository.
+  - The workflow is green on the PR, which builds the PR's merge commit. The logs show 176 tests
+    passing, the demo exiting with 0, and "without fmt".
+  - `ci-ok` is shown to turn red: Copilot can push only the PR's own branch, so a temporary commit
+    there makes one job fail, and the next commit reverts it. The PR links both runs.
+  - README and LEGENDUM are updated in parallel.
+  - **After merging**, with your settings applied: the workflow is green on `develop-release_1`; a
+    manual run starts from the Actions tab; Dependabot reports a successful check; both rulesets
+    require `ci-ok`. T6's PR records these results. Anything that cannot work yet is listed in
+    T5's PR, with the reason.
+- **Out of scope.**
+  - More compilers and both CMake versions (T6); Windows (T7); libc++, sanitizers and macOS (T8).
+  - Packaging jobs (T9, T12, T13).
+  - Wider triggers (T16).
+  - A format check (Q-14).
 
 #### T6: Linux compiler matrix
 - **Scope.**
@@ -723,7 +834,9 @@ recipes, profiles, `test_package`, and the `CMakeDeps`/`CMakeToolchain` generato
     - every install route;
     - the CI-verified toolchain table;
     - badges;
-    - versioning.
+    - versioning;
+    - the `FetchContent` example names the release tag instead of `develop-release_1` (T4);
+    - the title of both documents, still `cstr_view`, against the project's name, `ct_string`.
   - `CONTRIBUTING.md`, `SECURITY.md` and issue templates (Q-19).
 - **Done when:** the install instructions are covered by CI jobs (T9, T12, T13), and you have
   approved the docs, including the Latin.
@@ -839,9 +952,10 @@ Risk IDs use K-n, to avoid clashing with the requirement IDs (R-n) in §4.
 |---|---|---|---|
 | T1 | Merged | #14 | Plan, decisions, questions, findings. You then answered Q-01, Q-06, Q-16 and Q-21. |
 | T2 | Merged | #15 | fmt tests restored, with a guard (D-029); the four answers recorded; Q-22 and Q-23 added for T3. You then refined the Latin (#16). |
-| T3 | In review | this PR | Comparisons compile with libc++ 17+ (D-030); misnamed concept fixed (D-031); no comparator, hasher or lookup takes `nullptr` (D-032, Q-24); 176 tests; Q-25, Q-26 and Q-27 added for T8 |
-| T4 | Next: planned in full | — | Needs Q-09 (default 3.21) |
-| T5–T21 | Planned (outline) | — | Each is detailed in the PR of the task before it |
+| T3 | Merged | #17 | Comparisons compile with libc++ 17+ (D-030); misnamed concept fixed (D-031); no comparator, hasher or lookup takes `nullptr` (D-032, Q-24); 176 tests; Q-25, Q-26 and Q-27 added for T8. You then corrected the docs (#18). |
+| T4 | In review | this PR | Q-09 answered: CMake 3.21...4.4 (D-017); `ct_string` target with two aliases; three options (D-033); presets (D-034); module scanning off; F-15 |
+| T5 | Next: planned in full | — | Needs Q-14 (default: no formatter). You apply Q-16 and Q-21 after merging it. |
+| T6–T21 | Planned (outline) | — | Each is detailed in the PR of the task before it |
 
 ### M0 retrospective (written in T2)
 

@@ -4,7 +4,7 @@
 > This file records facts and measurements only. The decisions drawn from them are in
 > [DECISIONS.md](DECISIONS.md), and the plan that acts on them is in [PLAN.md](PLAN.md).
 > Runner images and compilers change, so re-check any finding before relying on it months later.
-> F-14 was added on 2026-10-11, during T3.
+> F-14 was added on 2026-10-11, during T3, and F-15 on 2026-10-18, during T4.
 
 ## F-1 Repository baseline
 
@@ -299,3 +299,38 @@ therefore gets in-repo vcpkg and Conan configurations instead (decision D-022, q
       (Q-26).
 - **Clang 16** still fails the smoke target, with the same compiler bug as in F-2. T3 did not
   change that.
+
+## F-15 Build environment details found while doing T4 (checked 2026-10-18)
+
+- **CMake versions.** CMake 3.21.4 and 4.4.4, both from PyPI, configure, build and test the T4
+  project with GCC 14. 4.4.4 is the newest CMake on PyPI, so T4 makes 4.4 the policy maximum
+  (D-017).
+- **Where module scanning fails (F-6).** On `develop-release_1` before T4, with CMake 4.4.4 and
+  Clang 19 or Clang 20, and `CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS` pointing at a missing file,
+  configuring fails. It fails inside GoogleTest's package file, which looks for threads: the test
+  compile for `-pthread` fails, so CMake reports "Could NOT find Threads". With `clang-scan-deps`
+  present, the old build has 39 scanning rules. After T4 it has none, and the same simulation
+  configures, builds and passes all 176 tests.
+- **Presets.**
+  - A preset's `condition` is inherited through `inherits`. With CMake 3.21.4 and 4.4.4 on Linux,
+    the MSVC and clang-cl presets are hidden.
+  - Build and test presets do not take the condition of the configure preset they name, so they
+    need their own.
+  - `-D` on the command line overrides a preset's cache variable, such as `CMAKE_CXX_COMPILER`.
+  - Preset schema 3 is the newest that CMake 3.21 reads.
+- **The demo needs the `en_US.UTF-8` locale** (`test_console_app/setup_streams.cpp:16` and `:19`).
+  In a plain `ubuntu:24.04` container it prints "Failed to setup streams: Failed to set locale to
+  "en_US.UTF-8"" and exits with 255, in Debug and in Release. After installing `locales` and running
+  `locale-gen en_US.UTF-8`, both exit with 0 (Q-15).
+- **The `ubuntu-24.04` runner** (image `20261012.334.1`): GCC 14.2 is `g++-14`, and plain `g++` is
+  GCC 13. CMake 3.31.6 and Ninja 1.13.2 are installed; GoogleTest and fmt are not. The
+  `windows-2022`, `windows-2025` and `macos-15-arm64` images also have Ninja 1.13.2.
+- **`actions/checkout`.** The newest release is v7.0.1 (2026-07-20), commit
+  `3d3c42e5aac5ba805825da76410c181273ba90b1`.
+- **Branches.** `main` is still the default branch and the only protected one. Neither `main` nor
+  `develop-release_1` has a `.github/` directory.
+- **A trap when testing in containers.** `find_package(... CONFIG)` also searches directories named
+  `<package>*` directly under each prefix, `/` included. A host directory mounted at `/fmtcmake`
+  was therefore taken for fmt's package. Mount dependencies at their real paths.
+- **Sources:** the T4 runs listed in PLAN.md (T4, Outcome); the `actions/runner-images` software
+  lists; the `actions/checkout` release page.
