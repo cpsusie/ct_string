@@ -1,0 +1,153 @@
+# Continuous integration (T5 of Copilot/PLAN.md).
+#
+# Builds and tests every push to, and pull request into, develop-release_1 and
+# main. For a pull request, GitHub builds the merge of the PR into its base
+# branch, so the PR is tested as it will be merged (D-013). The rulesets
+# require one check only, ci-ok, which fails unless every other job succeeded
+# (D-013, D-035). Security baseline: D-012.
+name: CI
+
+on:
+  push:
+    branches: [develop-release_1, main]
+  pull_request:
+    branches: [develop-release_1, main]
+  workflow_dispatch:
+  schedule:
+    # Mondays at 04:37 UTC: an odd minute, away from the busy top of the hour.
+    # Scheduled runs use the workflow on the default branch, and test it (F-12).
+    - cron: "37 4 * * 1"
+
+permissions:
+  contents: read
+
+# A newer run of a PR cancels the older one. Every other run gets a group of
+# its own, so pushes, manual and scheduled runs are never cancelled: within one
+# group, GitHub would cancel a pending run as soon as a third one arrives.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+defaults:
+  run:
+    # An explicit bash adds -o pipefail to GitHub's default -e.
+    shell: bash
+
+jobs:
+  gcc-14:
+    name: GCC 14, ${{ matrix.build-type }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - build-type: Debug
+            preset: gcc-debug
+          - build-type: Release
+            preset: gcc-release
+    env:
+      PRESET: ${{ matrix.preset }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Toolchain versions
+        run: |
+          echo "Runner image: ${ImageOS:-unknown} ${ImageVersion:-unknown}"
+          g++-14 --version
+          cmake --version
+          echo "Ninja $(ninja --version)"
+
+      # GoogleTest and fmt come from Ubuntu's packages (D-016). The demo needs
+      # the en_US.UTF-8 locale (F-15), which is generated here rather than
+      # assumed to be in the runner image.
+      - name: Install GoogleTest, fmt and the en_US.UTF-8 locale
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libgtest-dev libgmock-dev libfmt-dev locales
+          sudo locale-gen en_US.UTF-8
+          dpkg-query --show libgtest-dev libgmock-dev libfmt-dev
+
+      # The C++20 checks, the C++23 suite and the demo are all ON by default
+      # (D-033). The suite fails to compile if fmt goes missing (D-029).
+      - name: Configure
+        run: cmake --preset "$PRESET" -D CMAKE_CXX_COMPILER=g++-14
+
+      - name: Build
+        run: cmake --build --preset "$PRESET"
+
+      # --verbose shows GoogleTest's own summary, with the number of tests.
+      - name: Test
+        run: ctest --preset "$PRESET" --verbose
+
+      - name: Run the demo
+        run: |
+          status=0
+          "build/$PRESET/test_console_app" || status=$?
+          echo "test_console_app exited with $status"
+          exit "$status"
+
+  gcc-14-without-fmt:
+    name: GCC 14, C++20 checks without fmt
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      PRESET: gcc-debug
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Toolchain versions
+        run: |
+          echo "Runner image: ${ImageOS:-unknown} ${ImageVersion:-unknown}"
+          g++-14 --version
+          cmake --version
+          echo "Ninja $(ninja --version)"
+
+      # The library header uses fmt whenever <fmt/format.h> can be found (F-7).
+      # Should a runner image ever ship fmt, this job would silently stop
+      # testing the library without it, so it fails instead.
+      - name: Check that g++-14 cannot find fmt
+        run: |
+          if echo '#include <fmt/format.h>' | g++-14 -std=c++20 -E -x c++ - -o /dev/null 2>/dev/null; then
+            echo "::error::g++-14 finds <fmt/format.h>, so this job cannot build without fmt."
+            exit 1
+          fi
+          echo "g++-14 does not find <fmt/format.h>."
+
+      # Only the C++20 checks are built, so no test is registered and the test
+      # preset would fail by design (D-034): this job does not run ctest.
+      - name: Configure the C++20 checks alone
+        run: |
+          cmake --preset "$PRESET" -D CMAKE_CXX_COMPILER=g++-14 \
+            -D CT_STRING_BUILD_TESTS=OFF -D CT_STRING_BUILD_EXAMPLES=OFF \
+            | tee "$RUNNER_TEMP/configure.log"
+          if ! grep -Fq "ct_string: the C++20 checks build without fmt" "$RUNNER_TEMP/configure.log"; then
+            echo "::error::The configure output does not say that the C++20 checks build without fmt."
+            exit 1
+          fi
+
+      - name: Build
+        run: cmake --build --preset "$PRESET"
+
+  # The one check the rulesets require (D-013). A required check that is
+  # skipped counts as passed (F-12), so this job always runs, and fails unless
+  # every job it needs succeeded: a failed, cancelled or skipped job fails it.
+  # Every new job must be added to `needs`.
+  ci-ok:
+    name: ci-ok
+    if: always()
+    needs: [gcc-14, gcc-14-without-fmt]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Fail unless every job succeeded
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          jq -r 'to_entries[] | "\(.key): \(.value.result)"' <<< "$NEEDS"
+          jq -e 'all(.[]; .result == "success")' <<< "$NEEDS" > /dev/null

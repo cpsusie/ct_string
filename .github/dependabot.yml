@@ -1,0 +1,20 @@
+# Dependabot version updates (T5 of Copilot/PLAN.md, D-012, D-028).
+#
+# Keeps the SHA-pinned actions in .github/workflows current. Dependabot reads
+# this file only from the default branch, but sends its PRs to
+# develop-release_1, where all work lands, whichever branch is the default.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: develop-release_1
+    schedule:
+      interval: weekly
+    # A release is proposed only once it is a week old, so that a compromised
+    # release is likely to be found and withdrawn before it reaches CI.
+    cooldown:
+      default-days: 7
+    groups:
+      github-actions:
+        patterns:
+          - "*"

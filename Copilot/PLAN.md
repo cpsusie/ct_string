@@ -1,8 +1,9 @@
 # Development and release plan: `ct_string`
 
-> **Status:** T1 (PR #14), T2 (PR #15) and T3 (PR #17) merged; M0 and M1 are done (retrospectives
-> in §10). You then corrected the docs (PR #18). T4 in review. T5 planned in full.
-> **Last updated:** 2026-10-18.
+> **Status:** T1 (PR #14), T2 (PR #15), T3 (PR #17) and T4 (PR #19) merged; M0 and M1 are done
+> (retrospectives in §10). You corrected the docs after T3 (PR #18) and reviewed T4's Latin
+> (PR #20). T5 in review (PR #21). T6 planned in full.
+> **Last updated:** 2026-10-27.
 > **Approver:** @cpsusie. **Author:** Copilot.
 > **Brief:** [develop-release-project.md](develop-release-project.md).
 > **Companion documents:**
@@ -446,7 +447,7 @@ my standard library" is not the same as standard C++.
 *What you will learn:* CMake presets and options; GitHub Actions workflows, jobs, matrices,
 runners and containers; required status checks and rulesets; Dependabot; least-privilege tokens.
 
-#### T4: CMake hygiene (in review)
+#### T4: CMake hygiene (done: PR #19, merged 2026-10-22)
 - **Goal.** A consumer using `add_subdirectory` or `FetchContent` gets only the header-only
   library: no fmt, no GoogleTest, and CMake 3.21 or later. The project's own top-level build still
   builds and tests everything, now through options and presets (D-017, D-018, F-6, Q-01, Q-09).
@@ -570,8 +571,10 @@ runners and containers; required status checks and rulesets; Dependabot; least-p
   - **Found on the way (F-15).** Where module scanning fails; how presets inherit conditions; the
     demo needs the `en_US.UTF-8` locale and exits with 255 without it (T5 installs it; Q-15 notes
     it); what the `ubuntu-24.04` runner provides, for T5.
+  - **After merging.** You reviewed the Latin of the build passages, and how closely README and
+    LEGENDUM correspond there (PR #20).
 
-#### T5: CI skeleton and security baseline (NEXT TASK, planned in full)
+#### T5: CI skeleton and security baseline (in review: PR #21)
 - **Goal.** Every push to, and PR into, `develop-release_1` and `main` builds and tests the project
   on Linux with GCC 14, and one check, `ci-ok`, reports the result. The workflow follows the
   security baseline, and Dependabot keeps its action current (D-011 to D-014, D-016, D-028, Q-16,
@@ -656,22 +659,155 @@ runners and containers; required status checks and rulesets; Dependabot; least-p
   - Packaging jobs (T9, T12, T13).
   - Wider triggers (T16).
   - A format check (Q-14).
+- **Outcome.**
+  - **Answer.** Q-14: the default, no formatter before 1.0, which you accepted when T5 started:
+    "defer to 1.0 to maintain legible diffs" (D-036).
+  - **Branch.** `copilot/t5-ci-skeleton`.
+  - **`.github/workflows/ci.yml`**, as planned (D-035):
+    - the triggers of D-014's phase 1, with the weekly run on Mondays at 04:37 UTC;
+    - `permissions: contents: read`;
+    - the jobs "GCC 14, Debug", "GCC 14, Release" and "GCC 14, C++20 checks without fmt", each
+      with a timeout, `actions/checkout` v7.0.1 pinned to its commit without credentials, and a
+      step printing the runner image and the versions of `g++-14`, CMake and Ninja;
+    - the gate `ci-ok`.
+  - **`.github/dependabot.yml`**: GitHub Actions, weekly, into `develop-release_1`, one group.
+    **`.github/pull_request_template.md`**: the §3.3 headings and the §3.2 checklist.
+  - **Verified.**
+    - `actionlint` 1.7.12, with `shellcheck`; `zizmor` 1.31.1; the workflow and Dependabot
+      schemas. All pass (F-16).
+    - Both jobs, replayed in an `ubuntu:24.04` container with the same packages: 176 tests pass
+      in Debug and in Release, the demo exits with 0, and the configure output says "without fmt".
+    - On PR #21, run 40583728552 built the merge commit `b2ea263` (the PR merged into
+      `develop-release_1`), and was green. Its logs show "[  PASSED  ] 176 tests." in Debug and
+      in Release, "test_console_app exited with 0" in both, and "the C++20 checks build without
+      fmt".
+    - `ci-ok` turned red in run 40584049573, on a temporary commit that installed fmt in the job
+      that must not have it. The revert's run, 40584323698, was green (F-16).
+  - **Docs.** README and LEGENDUM, in parallel: a CI badge for `develop-release_1` under the
+    title, and a sentence in "Requirements" ("Quae requirantur") saying what CI checks.
+  - **Deviations from the plan.**
+    - **Run grouping.** Runs of a PR share a group, but every other run has its own, rather than
+      one group per branch: within one group GitHub cancels a pending run when a newer one
+      arrives, even when nothing is set to cancel (D-035, F-16).
+    - **Dependabot's 7-day cooldown**, which the plan did not have. `zizmor` recommended it
+      (D-035).
+    - **`ci-ok` has no checkout and no version step.** It builds nothing, so it needs neither.
+    - **Shell and matrix values.** Every `run` step uses `bash` with `pipefail`, and matrix values
+      reach scripts through environment variables (D-035).
+    - **The order of your settings.** The existing ruleset protects whichever branch is the
+      default, not `main` by name (F-16). The steps in PR #21 therefore turn it into the `main`
+      ruleset, and create the `develop-release_1` ruleset, before you switch the default branch;
+      step 6's order would have left `main` unprotected in between.
+  - **What can only be checked after merging**, and why (F-12): the weekly run and the manual
+    "Run workflow" button need the workflow on the default branch; Dependabot and the PR template
+    read the default branch too; the rulesets are yours to create. T6's PR records the results.
+  - **Found on the way (F-16).** How `concurrency` treats pending runs; that an explicit
+    `shell: bash` adds `pipefail`; Dependabot's default cooldown; that two jobs of one run can
+    get different runner images; the runner software of 2026-10-23.
+  - **Planning T6 (F-17).** A prototype of T6's matrix found that Clang 20 and later cannot use
+    Ubuntu 26.04's fmt header-only, and that formatting a view needs fmt 8 or later (Q-28).
 
-#### T6: Linux compiler matrix
-- **Scope.**
-  - C++20 floor matrix:
-    - GCC 11.1 (official container), 11.4, 12, 13, 14 and 15;
-    - Clang 17, 18, 19 (Ubuntu archive), 20, 21 and 22.
-  - C++23 suite on GCC 14 and 15 and on Clang 19–22.
-  - Jobs for the minimum and newest CMake.
-  - Linux arm64 (Q-18).
-  - `fail-fast` off, and every job logs its toolchain version.
-  - README and LEGENDUM get a Linux toolchain table, stated as "verified by CI".
-- **Done when:**
-  - all jobs are green;
-  - the documented table matches the matrix;
-  - the floor jobs are shown to turn red on a scratch branch that adds a C++23-only construct to a
-    header.
+#### T6: Linux compiler matrix (NEXT TASK, planned in full)
+- **Goal.** CI checks on Linux what README promises (D-005 to D-008, D-017):
+  - the library builds as C++20 with every GCC from the floor (11.1, Q-04) to 15, and every Clang
+    from the floor (17, Q-05) to 22, with fmt and without it;
+  - the C++23 suite and the demo pass on GCC 14 and 15 and on Clang 19 to 22, in Debug and
+    Release;
+  - the oldest and the newest CMake both build the project;
+  - one arm64 job runs the suite (Q-18).
+
+  README and LEGENDUM then list exactly what CI checks.
+- **What planning found.** A throwaway prototype in containers on 2026-10-27 (F-17), and the
+  runner software lists of 2026-10-23 (F-16):
+  - **Where each compiler is.**
+    - `ubuntu-22.04`: GCC 11.4 and 12.3; Ubuntu's fmt 8.1.1.
+    - `ubuntu-24.04`: GCC 13.3 and 14.2, Clang 17 and 18, and Clang 19 from the Ubuntu archive;
+      fmt 9.1.0.
+    - `ubuntu-26.04`: GCC 15.2, Clang 20, 21 and 22, CMake 4.4.4; fmt 10.1.1.
+    - GCC 11.1: only the official `gcc:11.1` image (Debian 11, from 2021). Its `apt` still works,
+      but Debian 11's support has ended, so its packages may move. The job therefore takes nothing
+      from `apt`: CMake and Ninja come from their release archives, and fmt is built from its
+      release archive, all checked against a pinned SHA-256. Node 24, which runs
+      `actions/checkout`, runs in the image.
+  - **All of them build the C++20 checks**, with fmt and without it. Clang 16 still fails (F-2).
+  - **Clang 20, 21 and 22 cannot use Ubuntu 26.04's fmt 10.1.1 header-only**: fmt's own header
+    does not compile. fmt 11.1 fixed it. With fmt 12.2.0, the newest, built from its release
+    archive, everything passes, so those jobs use it.
+  - **The real fmt minimum is 8.0.** Formatting a view does not compile with fmt 6 or 7, and the
+    C++20 checks cannot notice, because they never format one (Q-28).
+  - **The suite and the demo** pass on GCC 14 and 15 and on Clang 19 to 22: 176 tests, and the
+    demo exits with 0. On Clang 18 the demo fails (no `std::expected`), and on Clang 17 the suite
+    fails; D-008 promises neither.
+  - **CMake.** Kitware's 3.21.0, 3.21.7, 4.4.5 and 4.5.0-rc1, and Ubuntu's 3.22, 3.28 and 4.2,
+    all build the project and pass.
+  - **arm64** could not be tried here. `ubuntu-24.04-arm` has the same software as `ubuntu-24.04`.
+- **Branch:** a new branch from `develop-release_1`, for example `copilot/t6-linux-matrix`.
+- **Questions:** Q-04, Q-05, Q-17, Q-18 and Q-28 are needed. If any is still open when T6 starts,
+  T6 uses its default and asks again in its PR. The steps below assume the defaults: GCC floor
+  11.1; Clang floor 17; the full matrix on every run, with anonymous pulls from Docker Hub; one
+  arm64 job; fmt 8.0 or later.
+- **Steps.**
+  1. **T5's results after merging.** T6's PR, and T5's Outcome, record: the first push run on
+     `develop-release_1`; a manual run; Dependabot's status (you look at its page); the rulesets
+     and the default branch, read back through GitHub's API; and whether GitHub finds the PR
+     template.
+  2. **The C++20 checks, 12 jobs**, named "*compiler version*, C++20 checks". Each job prints its
+     toolchain; checks that the compiler cannot find `<fmt/format.h>`; builds the checks alone and
+     checks that the configure output says "without fmt"; installs fmt; then builds them again in
+     a second build directory, and checks that it says "with fmt". They replace T5's job "GCC 14,
+     C++20 checks without fmt".
+
+     | Job | Runner (image) | Compiler | fmt |
+     |---|---|---|---|
+     | GCC 11.1 | `gcc:11.1`, pinned by digest, on `ubuntu-24.04` | `g++` | 8.0.1, built |
+     | GCC 11.4, GCC 12.3 | `ubuntu-22.04` | `g++-11`, `g++-12` | Ubuntu's 8.1.1 |
+     | GCC 13.3, GCC 14.2 | `ubuntu-24.04` | `g++-13`, `g++-14` | Ubuntu's 9.1.0 |
+     | Clang 17, 18 and 19 | `ubuntu-24.04` | `clang++-17` to `-19` (19 from the archive) | Ubuntu's 9.1.0 |
+     | GCC 15.2 | `ubuntu-26.04` | `g++-15` | Ubuntu's 10.1.1 |
+     | Clang 20, 21 and 22 | `ubuntu-26.04` | `clang++-20` to `-22` | 12.2.0, built |
+
+     The GCC 11.1 job uses CMake 3.21.0 and Ninja 1.13.2 from their release archives, so the
+     floor compiler is checked with the oldest CMake too.
+  3. **The suite and the demo, 14 jobs**, named "*compiler*, Debug" and "*compiler*, Release", as
+     T5's GCC 14 jobs are:
+     - GCC 14 and Clang 19 on `ubuntu-24.04`; GCC 15 and Clang 20, 21 and 22 on `ubuntu-26.04`,
+       with fmt 12.2.0 for the Clangs; each in Debug and in Release;
+     - "GCC 14, Debug, CMake 3.21.0", with Kitware's archive, on `ubuntu-24.04`;
+     - "GCC 14, Debug, arm64", on `ubuntu-24.04-arm` (Q-18).
+
+     The `ubuntu-26.04` jobs use the runner's CMake, the newest of all the runners (4.4.4 today),
+     so the newest CMake is checked with no extra job. Every job logs its versions.
+  4. **`.github/scripts/install-fmt.sh`**: downloads one fmt release archive, checks it against
+     the SHA-256 that the workflow pins beside the version, builds it with the job's compiler, and
+     installs it. The GCC 11.1 job and the CMake 3.21.0 job get CMake (and Ninja) the same way.
+  5. **The C++20 checks format a view** whenever fmt is found: a narrow one, and a wide one when
+     `<fmt/xchar.h>` is there. About ten lines in `tests/cxx20_header_smoke.cpp` (Q-28).
+  6. **`ci-ok` checks its own list** (K-14). It checks out only `.github/workflows/ci.yml`, lists
+     the workflow's jobs with `yq` (on every runner), and fails if one is missing from `needs`.
+  7. **Docs**, in README and LEGENDUM together. In "Requirements" ("Quae requirantur"): a table of
+     the Linux toolchains CI checks, with what each one runs, replacing T5's CI sentence; and the
+     fmt notes: 8.0 or later to format a view, and, with Clang 20 or later, 11.1 or later when fmt
+     is used header-only. The Windows lines stay until T7.
+  8. **Decisions and plan.**
+     - D-006 and D-007 follow Q-04 and Q-05; the fmt minimum follows Q-28.
+     - D-015 and D-016 gain the exception: where neither the runner nor the Ubuntu archive has a
+       usable tool or library, a release archive, pinned by SHA-256 (CMake, Ninja, fmt).
+     - D-017: the oldest CMake checked is 3.21.0. D-035: `ci-ok` checks out `ci.yml`.
+     - This plan: status, and T7 in full.
+- **Definition of done.**
+  - `actionlint` and `zizmor` pass, run locally.
+  - All jobs are green on the PR. The logs show each job's toolchain and fmt version, and "with
+    fmt" and "without fmt" in each C++20 job.
+  - The README table matches the matrix.
+  - The floor jobs and the self-check are shown to turn red: one temporary commit adds a call to
+    `std::ranges::to`, which C++20 does not have, to a header, and drops one job from `ci-ok`'s
+    `needs`; the next commit reverts it. The PR links both runs.
+  - The wall time of a full run is recorded (Q-17).
+  - README and LEGENDUM are updated in parallel.
+- **Out of scope.**
+  - Windows (T7); libc++, sanitizers and macOS (T8).
+  - Making the header ignore an fmt older than 8 (T11, Q-28).
+  - Caching fmt builds, unless they make runs too slow.
 
 #### T7: Windows matrix
 - **Scope.**
@@ -912,6 +1048,10 @@ matters more than the dates.
 | 8 | T17, T18 (your promotion and tag) → **v1.0.0 released** | M5 re-plan |
 | 9+ | T19, T20 (registry reviews take days to weeks), T21 (plus your documentation promotion) | M6 close-out |
 
+**Progress (2026-10-27).** T4 was merged in week 2. T5 is in review in week 3, the week planned
+for T6 and T7, so the plan runs about one week behind. The M2 checkpoint, after T8, re-baselines
+the dates.
+
 ## 8. Risks and mitigations
 
 Risk IDs use K-n, to avoid clashing with the requirement IDs (R-n) in §4.
@@ -920,7 +1060,7 @@ Risk IDs use K-n, to avoid clashing with the requirement IDs (R-n) in §4.
 |---|---|---|---|---|
 | K-1 | An older MSVC toolset or a clang-cl rejects valid C++20 | Medium | Medium | Probe each one in T7. You decide between a workaround and dropping it (Q-06). |
 | K-2 | The test code has more libc++ differences | Low: in T3 the whole suite passed with libc++ 20, unchanged | Low–Medium | T3 is limited to the library; test-code issues go to T8. The one difference found, the `std::format` tests with libc++ 17 and 18, is Q-25. |
-| K-3 | Runner images change (compilers removed, `windows-2022` retired) | High over a year | Medium | Explicit labels, a weekly run (Q-21), toolchain versions logged; small PRs to adjust the matrix. |
+| K-3 | Runner images change (compilers removed, `windows-2022` retired) | High over a year | Medium | Explicit labels, a weekly run (Q-21), toolchain versions and the image version logged in every job; small PRs to adjust the matrix. A new image reaches runners gradually, so two jobs of one run can differ (F-16). |
 | K-4 | Docker Hub rate-limits `gcc:11.1` pulls | Low–Medium | Low | An access-token secret or a mirror (Q-17). |
 | K-5 | Registry reviewers ask for changes (naming, layout) | Medium | Medium | Follow their guides from the start (F-10). The in-repo port and recipe work in the meantime. |
 | K-6 | Review bandwidth, with one PR at a time | Medium | Schedule only | Small PRs; a relative timeline. |
@@ -931,13 +1071,16 @@ Risk IDs use K-n, to avoid clashing with the requirement IDs (R-n) in §4.
 | K-11 | Installing older MSVC toolsets makes PR runs slow, or one is withdrawn from the installer | Medium | Low–Medium | T7 measures the cost, and Q-06 option (b) moves the full sweep to after merging. A toolset that cannot be installed fails its job visibly; a small PR then updates the matrix and the docs. |
 | K-12 | Features that read the default branch silently do nothing (weekly run, Dependabot, templates) | Low, once you switch the default branch after T5 (Q-21) | Medium | F-12 and Q-21. T5 checks each feature after merging. |
 | K-13 | `main` changes outside promotions, so a promotion conflicts | Low | Medium | Rulesets allow changes to `main` only through PRs; Dependabot's security PRs, which would target `main`, are off (D-012); promotions use a merge commit (D-003). |
+| K-14 | A new job is left out of `ci-ok`'s `needs`, so its failure does not block merging | Medium: T6–T8 add dozens of jobs | Medium | T6 adds a step to `ci-ok` that fails when a job of the workflow is missing from its `needs` (D-035). |
+| K-15 | The GCC 11.1 job breaks for reasons outside the project: Docker Hub limits pulls, Debian 11's packages move, or a future Node for actions no longer runs on its old C library | Low–Medium | Medium | The job takes nothing from `apt` and pins the image by digest (T6); Q-17 covers the pull limits. If actions stop running in the image, the job runs on the runner and calls `docker run` for the build steps. |
 
 ## 9. What only you can do
 
 1. Review and merge every PR.
 2. Answer [QUESTIONS.md](QUESTIONS.md), now or by each question's "Needed by" task.
-3. **After T5:** create the two branch rulesets, and set the merge options and the Dependabot
-   settings (Q-16). Make `develop-release_1` the default branch (Q-21).
+3. **After T5:** following the click-by-click steps in PR #21, create the two branch rulesets, and
+   set the merge options and the Dependabot settings (Q-16). Make `develop-release_1` the default
+   branch (Q-21).
 4. **T6, only if needed:** add a Docker Hub access-token secret (Q-17).
 5. **After T15:** push the `v1.0.0-rc.1` tag on `develop-release_1` (the dry run).
 6. **T18:** promote `develop-release_1` into `main` (a PR you open, merged with a merge commit),
@@ -953,9 +1096,10 @@ Risk IDs use K-n, to avoid clashing with the requirement IDs (R-n) in §4.
 | T1 | Merged | #14 | Plan, decisions, questions, findings. You then answered Q-01, Q-06, Q-16 and Q-21. |
 | T2 | Merged | #15 | fmt tests restored, with a guard (D-029); the four answers recorded; Q-22 and Q-23 added for T3. You then refined the Latin (#16). |
 | T3 | Merged | #17 | Comparisons compile with libc++ 17+ (D-030); misnamed concept fixed (D-031); no comparator, hasher or lookup takes `nullptr` (D-032, Q-24); 176 tests; Q-25, Q-26 and Q-27 added for T8. You then corrected the docs (#18). |
-| T4 | In review | this PR | Q-09 answered: CMake 3.21...4.4 (D-017); `ct_string` target with two aliases; three options (D-033); presets (D-034); module scanning off; F-15 |
-| T5 | Next: planned in full | — | Needs Q-14 (default: no formatter). You apply Q-16 and Q-21 after merging it. |
-| T6–T21 | Planned (outline) | — | Each is detailed in the PR of the task before it |
+| T4 | Merged | #19 | Q-09 answered: CMake 3.21...4.4 (D-017); `ct_string` target with two aliases; three options (D-033); presets (D-034); module scanning off; F-15. You then reviewed the Latin (#20). |
+| T5 | In review | this PR (#21) | Q-14 answered: no formatter before 1.0 (D-036). CI workflow, `ci-ok` gate, Dependabot and PR template (D-035); F-16. You apply Q-16 and Q-21 after merging it. |
+| T6 | Next: planned in full | — | Needs Q-04, Q-05, Q-17, Q-18 and Q-28 (defaults: GCC 11.1, Clang 17, anonymous Docker Hub pulls, one arm64 job, fmt 8.0). 26 build jobs, found in a prototype (F-17). Records the results of your T5 settings. |
+| T7–T21 | Planned (outline) | — | Each is detailed in the PR of the task before it |
 
 ### M0 retrospective (written in T2)
 
@@ -1003,6 +1147,8 @@ Later milestone retrospectives will be added here.
 - An API reference site (Doxygen or similar).
 - Measurements of compile-time cost; fuzzing of the case-folding code.
 - clang-tidy and coverage reports in CI.
+- A `.clang-format` that matches the current style, one PR that reformats everything, and a CI
+  format check (Q-14, D-036).
 - MinGW-w64 GCC on Windows, and Windows arm64.
 - Other package managers (xmake, build2). CPM.cmake already works through `FetchContent`.
 
@@ -1023,6 +1169,10 @@ Later milestone retrospectives will be added here.
 - **Promotion.** Merging the reviewed development branch into `main` for a release. It uses a merge
   commit, so both branches keep one history.
 - **Pinning to a SHA.** Referring to a third-party action by commit hash rather than a movable tag.
+- **Concurrency group.** Runs that share a group wait for each other. A newer run can cancel an
+  older one: CI uses that for the runs of one PR, where only the newest matters (D-035).
+- **Cooldown.** How long Dependabot waits after a release before proposing it, so a bad release
+  can be withdrawn first.
 - **Overlay port.** A vcpkg port kept outside the official registry, used here before submission.
 - **Manifest and baseline.** `vcpkg.json` lists the dependencies. The baseline pins the registry
   version, so builds are reproducible.

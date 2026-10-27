@@ -109,6 +109,22 @@ reused, so they may appear out of numeric order.
   - Fixing the macro first means the CI built later actually runs the fmt tests.
   - Fixing libc++ first lets the libc++ CI job (T8) start green.
 
+### D-036 No code formatter before 1.0
+- **Date:** 2026-10-27. **Status:** Accepted: Q-14 answered with the recommended default on
+  2026-10-27. **Related:** T5, Q-14, PLAN.md §11.
+- **Decision:**
+  - No `.clang-format`, no reformatting and no format check in CI before 1.0. New code follows
+    the style of the code around it, by hand, as it does today.
+  - After 1.0, the backlog has a `.clang-format` that matches the current style, one PR that
+    reformats everything, and a CI job that checks the format from then on.
+- **Why:**
+  - Your answer: "defer to 1.0 to maintain legible diffs". Reformatting touches nearly every line,
+    so every review until 1.0 would compare whole files.
+  - `git blame` keeps pointing at real changes.
+- **Alternative:** Adopt a formatter now, with one reformatting PR before T6 and a CI check. The
+  diffs of every task after it would then be clean, at the price of one PR that is hard to
+  review.
+
 ---
 
 ## Supported toolchains
@@ -504,6 +520,9 @@ reused, so they may appear out of numeric order.
   - Every job has a timeout, and superseded PR runs are cancelled.
 - **Why:** GitHub's hardening guidance. Pinning to a SHA guards against a compromised or
   re-pointed tag. Least privilege limits the damage if something does go wrong.
+- **Applied in T5 (PR #21).** Every item above, in `ci.yml` and `dependabot.yml`. One addition:
+  Dependabot waits 7 days after a version is released before proposing it (D-035). You turn on
+  the alerts, and leave the security-update PRs off, when you apply Q-16.
 
 ### D-013 PRs are tested as they will be merged, behind one required check
 - **Date:** 2026-10-10. **Status:** Accepted (T1, PR #14). **Related:** T5, Q-16, F-12.
@@ -524,6 +543,8 @@ reused, so they may appear out of numeric order.
     failed could let a broken PR through.
   - With one required check, adding or renaming matrix jobs never needs a ruleset change.
 - **Alternative:** A merge queue. With one PR at a time it adds nothing over the up-to-date rule.
+- **Applied in T5 (PR #21).** The `pull_request` trigger and the `ci-ok` job (D-035). The rulesets
+  follow when you apply Q-16.
 
 ### D-014 Trigger scope grows in two phases
 - **Date:** 2026-10-10. **Status:** Accepted (T1, PR #14). **Related:** T5, T16, D-028.
@@ -585,6 +606,47 @@ reused, so they may appear out of numeric order.
   - As a bonus, CI covers several fmt versions (Ubuntu's 9.x/10.x and the newest from vcpkg and
     Conan).
 
+### D-035 The CI workflow: job names, the `ci-ok` gate, run grouping and Dependabot's delay
+- **Date:** 2026-10-27. **Status:** Proposed. **Related:** T5, T6–T8, D-011 to D-014, D-016,
+  D-028, D-034, F-12, F-16.
+- **Decision:**
+  - **One workflow**, `.github/workflows/ci.yml`. Each job's display name says which compiler and
+    what it checks: "GCC 14, Debug", "GCC 14, Release", "GCC 14, C++20 checks without fmt". Later
+    jobs follow the pattern "*compiler version*, *what*".
+  - **The gate.** The job `ci-ok`, with that exact name, because the rulesets require the check by
+    name. It needs every other job, runs even when they fail (`if: always()`), prints each job's
+    result, and fails unless every result is `success`. A failed, cancelled or skipped job fails
+    it. It checks out nothing.
+  - **Run grouping (`concurrency`).** All runs of one PR share a group, and a newer run cancels the
+    older one. Every other run (push, manual, weekly) has a group of its own, so it is never
+    cancelled.
+  - **Shell.** Every `run` step uses `bash` with `-e -o pipefail`. Values from the matrix reach
+    scripts through environment variables, never by expanding `${{ }}` inside a script.
+  - **Timeouts.** Several times each job's measured length: 20 minutes for the suite jobs (46 s on
+    the first run), 10 for the job without fmt (9 s), 5 for `ci-ok` (4 s).
+  - **Dependabot** waits 7 days after an action's release before proposing it (`cooldown`).
+- **Why:**
+  - A display name that says what failed saves opening the log.
+  - The gate is D-013's design. Treating skipped as failed is what makes it safe (F-12).
+  - Within one `concurrency` group, GitHub keeps one running and one pending run, and cancels the
+    pending one when a newer run arrives, even when `cancel-in-progress` is off (F-16). One group
+    per branch, as T5's plan said, would therefore cancel a push run whenever two more pushes
+    followed it quickly. D-012 asks only that superseded PR runs be cancelled.
+  - Without `pipefail`, a failing command piped into `tee` would not fail its step. Expanding
+    `${{ }}` inside a script is how untrusted input becomes code (script injection); environment
+    variables cannot be injected that way.
+  - A timeout well above the normal length stops a hung job early without failing a slow runner.
+  - A week's delay lets a broken or compromised release be withdrawn before Dependabot proposes it.
+    GitHub applies a 3-day delay by default; `zizmor`, a workflow security linter, recommends at
+    least 7 (F-16). It does not delay security updates.
+- **Alternatives:**
+  - One group per branch, with GitHub's new `queue: max` setting, which keeps up to 100 pending
+    runs. GitHub does not allow it together with `cancel-in-progress: true`, which PR runs need,
+    and `actionlint` 1.7.12 does not know the setting yet, and rejects it (F-16).
+  - A required check per job. Every new or renamed job would need a ruleset change (D-013).
+  - A third-party action that computes the gate. One more action to pin and trust, for two lines
+    of `jq`.
+
 ---
 
 ## Build system and packaging
@@ -641,8 +703,8 @@ reused, so they may appear out of numeric order.
   come in T9.
 
 ### D-033 The CMake options, their defaults, and when fmt and GoogleTest are looked up
-- **Date:** 2026-10-18. **Status:** Proposed. **Related:** T4, T10, T11, D-018, D-029, F-7, Q-01,
-  Q-15.
+- **Date:** 2026-10-18. **Status:** Accepted (T4, PR #19). **Related:** T4, T10, T11, D-018,
+  D-029, F-7, Q-01, Q-15.
 - **Decision:**
   - Three options:
     - `CT_STRING_BUILD_CXX20_CHECKS` builds the C++20 smoke check (D-005);
@@ -673,7 +735,7 @@ reused, so they may appear out of numeric order.
     what they do today.
 
 ### D-034 CMake presets: schema 3, four compilers, Debug and Release
-- **Date:** 2026-10-18. **Status:** Proposed. **Related:** T4, T5–T7, D-017, Q-09.
+- **Date:** 2026-10-18. **Status:** Accepted (T4, PR #19). **Related:** T4, T5–T7, D-017, Q-09.
 - **Decision:**
   - `CMakePresets.json` uses preset schema version 3, the newest that CMake 3.21 reads.
   - Eight configure presets: `gcc`, `clang`, `msvc` and `clang-cl`, each `-debug` and
