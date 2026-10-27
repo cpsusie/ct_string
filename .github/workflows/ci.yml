@@ -111,9 +111,6 @@ jobs:
       # The library header uses fmt whenever <fmt/format.h> can be found (F-7).
       # Should a runner image ever ship fmt, this job would silently stop
       # testing the library without it, so it fails instead.
-      - name: "TEMPORARY, reverted by the next commit: install fmt, so that the next step fails"
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libfmt-dev
-
       - name: Check that g++-14 cannot find fmt
         run: |
           if echo '#include <fmt/format.h>' | g++-14 -std=c++20 -E -x c++ - -o /dev/null 2>/dev/null; then
