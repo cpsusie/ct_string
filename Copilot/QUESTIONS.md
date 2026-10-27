@@ -17,6 +17,9 @@ questions.
   by T8.
 - **In T4:** you answered Q-09 when T4 started; T4 applies it (D-017). The next questions needed
   are Q-14, by T5, and then Q-04, Q-05, Q-17 and Q-18, by T6.
+- **In T5:** you answered Q-14 when T5 started (D-036). Planning T6 found Q-28. The next questions
+  needed are Q-04, Q-05, Q-17, Q-18 and Q-28, all by T6. If they are still open when T6 starts, T6
+  uses their defaults and asks again in its PR.
 
 ## Summary
 
@@ -35,7 +38,7 @@ questions.
 | Q-11 | Release and branch flow | T15 | You promote `develop-release_1` into `main` (merge commit) and push tag `vX.Y.Z` there → workflow publishes; pre-release tags go on `develop-release_1` | Open |
 | Q-12 | Who submits to vcpkg and ConanCenter | T19 | You, using files and steps Copilot prepares | Open |
 | Q-13 | Which new documents need Latin | T14 | Only README and LEGENDUM are bilingual; everything else is English | Open |
-| Q-14 | Code formatter (clang-format) | T5 | Not before 1.0; revisit afterwards | Open |
+| Q-14 | Code formatter (clang-format) | T5 | Not before 1.0; revisit afterwards | **Answered:** default (D-036) |
 | Q-15 | Role of `test_console_app` | T10 | A demo that checks itself: move it to `examples/`, behind an option; CI builds and runs it | Open |
 | Q-16 | GitHub repository settings | T5 | Two rulesets requiring the one `ci-ok` check: `develop-release_1` (up to date, squash) and `main` (merge commit); delete merged branches; Dependabot security PRs off | **Answered:** default, applied by you after T5 |
 | Q-17 | CI budget and Docker Hub | T6 | Full matrix (about 50 jobs) on every PR and push; anonymous pulls of the official `gcc` images | Open |
@@ -49,6 +52,7 @@ questions.
 | Q-25 | `std::formatter` with libc++ 17 and 18 | T8 | Keep the standard feature test, and document the gap; T8 makes the `std::format` tests impossible to lose silently | Open |
 | Q-26 | `nullptr` in the view's members that mirror `std::basic_string_view` | T8 | Reject it in the 11 overloads where it is always undefined behaviour | Open |
 | Q-27 | Checking that the deleted `nullptr` overloads are the ones chosen | T8 | A compile-fail check run by CTest, added in T8 with Q-26 | Open |
+| Q-28 | The oldest fmt the library supports | T6 | fmt 8.0; CI formats a view with it; T11 makes the header ignore older fmt | Open |
 
 ---
 
@@ -229,7 +233,10 @@ questions.
   touches nearly every line.
 - **Recommendation.** Do not adopt one before 1.0, to keep diffs reviewable. Revisit afterwards with
   a configuration that matches your current style.
-- **Answer:** _pending_
+- **Answer (2026-10-27, when T5 started):** the recommendation is accepted: "I agree ... defer to
+  1.0 to maintain legible diffs." There is no `.clang-format` and no format check before 1.0
+  (D-036). A configuration that matches the current style, with a CI check, is in the backlog
+  (PLAN.md §11).
 
 ### Q-15 Role of `test_console_app`
 - **Context.** It is a C++23 program using `std::expected` and fmt. It demonstrates the library, and
@@ -491,4 +498,27 @@ questions.
     so it could break unnoticed.
   - (d) Neither: the compile-time checks, and the manual run recorded in D-032, are enough.
 - **When.** T8, unless you want it in the T3 PR.
+- **Answer:** _pending_
+
+### Q-28 The oldest fmt the library supports
+- **Context** (FINDINGS F-17, found while planning T6).
+  - The header turns on its fmt support whenever it can include `<fmt/format.h>` (F-7).
+  - With fmt 6 or 7, a program that formats a view does not compile: the library's formatter
+    calls a function that fmt made `const` only in version 8. fmt 8.0.1 and every later version
+    tested work.
+  - fmt before 8 has no `<fmt/xchar.h>`, so wide formatting is silently left out.
+  - Nobody noticed because the C++20 checks never format a view, and the suite in CI uses fmt
+    9.1.
+  - Separately, fmt 10.1.1, 10.2.1 and 11.0.2 in header-only mode do not compile with Clang 20 or
+    later; that is fmt's own header, whatever the library does, and fmt 11.1 fixed it. T6
+    documents it.
+- **Options:**
+  - (a) **Support fmt 8.0 and later.** T6 makes the C++20 checks format a narrow and a wide view
+    whenever fmt is found, so CI catches a break; the GCC 11.1 job uses fmt 8.0.1, the oldest
+    that works; README and LEGENDUM state the minimum. T11 then makes the header ignore an older
+    fmt, as if it were not installed, instead of failing once a view is formatted. *(Recommended:
+    fmt 8.0 came out in June 2021, the same year as GCC 11.1, and Ubuntu 22.04 ships 8.1.)*
+  - (b) As (a), but T11 makes the header stop with an `#error` when it finds an older fmt. That
+    breaks programs that have fmt 7 installed and never format a view.
+  - (c) Support fmt 7 as well, with a workaround in the formatter for the missing `const`.
 - **Answer:** _pending_

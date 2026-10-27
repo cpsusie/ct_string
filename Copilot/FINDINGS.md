@@ -4,7 +4,8 @@
 > This file records facts and measurements only. The decisions drawn from them are in
 > [DECISIONS.md](DECISIONS.md), and the plan that acts on them is in [PLAN.md](PLAN.md).
 > Runner images and compilers change, so re-check any finding before relying on it months later.
-> F-14 was added on 2026-10-11, during T3, and F-15 on 2026-10-18, during T4.
+> F-14 was added on 2026-10-11, during T3, F-15 on 2026-10-18, during T4, and F-16 and F-17 on
+> 2026-10-27, during T5.
 
 ## F-1 Repository baseline
 
@@ -334,3 +335,140 @@ therefore gets in-repo vcpkg and Conan configurations instead (decision D-022, q
   was therefore taken for fmt's package. Mount dependencies at their real paths.
 - **Sources:** the T4 runs listed in PLAN.md (T4, Outcome); the `actions/runner-images` software
   lists; the `actions/checkout` release page.
+
+## F-16 CI details found while doing T5 (checked 2026-10-27)
+
+**The first CI runs** (PR #21: runs [40583728552], [40584049573] and [40584323698]):
+- **Toolchain.** `ubuntu-24.04` image `20261023.334.3`, with GCC `14.2.0-4ubuntu2~24.04.1` as
+  `g++-14`, CMake 3.31.6 and Ninja 1.13.2. Ubuntu's packages: `libfmt-dev` 9.1.0+ds1-2,
+  `libgtest-dev` and `libgmock-dev` 1.14.0-1.
+- **Images roll out gradually.** In the first run, the Release job ran on image `20261026.354.1`
+  and the other jobs on `20261023.334.3`. Two jobs of one run can therefore see different images;
+  the version step in every job shows which.
+- **Times.** Debug 35–40 s, Release 46–67 s, the job without fmt 9–27 s, `ci-ok` 3–4 s; a whole
+  run 52–72 s from start to finish.
+- **`ci-ok` turns red.** The temporary commit `78a4a3f` installed fmt in the job that must not have
+  it. That job's guard failed ("g++-14 finds <fmt/format.h>"), and `ci-ok` printed
+  `gcc-14-without-fmt: failure` and failed. The next commit reverted it, and the run was green.
+
+**GitHub behaviour:**
+- **Concurrency.** Within one `concurrency` group, GitHub keeps one running and one pending run.
+  When another run arrives, the pending one is cancelled, even with `cancel-in-progress` off. A
+  new optional setting, `queue: max`, keeps up to 100 pending runs, but cannot be combined with
+  `cancel-in-progress: true`. `actionlint` 1.7.12 does not know it yet ("unexpected key
+  \"queue\""). Source: GitHub's workflow-syntax documentation.
+- **Shell.** A `run` step without a `shell` runs `bash -e {0}`: a failure on the left of a pipe is
+  lost. With `shell: bash` set explicitly, it runs `bash --noprofile --norc -e -o pipefail {0}`
+  (seen in the logs).
+- **Dependabot** applies a 3-day cooldown to version updates by default, even when none is
+  configured; security updates are never delayed. Source: the Dependabot options reference.
+
+**Repository settings** (read through the API on 2026-10-27; nothing was changed):
+- The default branch is `main`. Squash merges, merge commits and rebase merges are all allowed;
+  "Automatically delete head branches" is off.
+- One ruleset, "Prohibit Push n stuff", is active, with no bypass. It blocks deletion and force
+  pushes on **the default branch**, whatever that is (`~DEFAULT_BRANCH`), not on `main` by name.
+  That is why `main` shows as protected. Once `develop-release_1` is the default branch, the
+  ruleset would protect it instead, and `main` would have no protection left. The settings steps
+  in PR #21 therefore protect `main` by name before switching the default branch.
+- Classic branch protection rules and the Dependabot settings cannot be read with this session's
+  token (HTTP 403), so the steps ask you to look.
+
+**Tools** (run locally; none is added to the repository):
+- `actionlint` 1.7.12, with `shellcheck` 0.9.0: no findings.
+- `zizmor` 1.31.1, a security linter for workflows, offline and online audits: one finding, the
+  missing Dependabot cooldown (it recommends at least 7 days). T5 adds it (D-035).
+- `check-jsonschema` validates `ci.yml` and `dependabot.yml` against their published schemas.
+
+**Runner images** (software lists dated 2026-10-23; F-8 is the earlier snapshot):
+
+| Label | Image | GCC | Clang | CMake |
+|---|---|---|---|---|
+| `ubuntu-22.04` | 20261023.322.3 | 10.5, 11.4, 12.3 | 13.0.1, 14.0.0, 15.0.7 | 3.31.6 |
+| `ubuntu-24.04` | 20261023.334.3 | 12.4, 13.3, 14.2 | 16.0.6, 17.0.6, 18.1.3 | 3.31.6 |
+| `ubuntu-24.04-arm` | 20261023.149.3 | 12.4, 13.3, 14.2 | 16.0.6, 17.0.6, 18.1.3 | 3.31.6 |
+| `ubuntu-26.04` | 20261023.163.3 | 13.4, 14.3, 15.2 | 20.1.8, 21.1.8, 22.1.2 | 4.4.4 |
+
+- Every one has Ninja 1.13.2, `jq` and `yq` 4.54.1, and Docker.
+- Labels listed by `actions/runner-images`: `ubuntu-22.04`, `ubuntu-24.04`, `ubuntu-26.04` and
+  their `-arm` variants, `ubuntu-slim`, `macos-15` and `macos-26` (`macos-14` is deprecated),
+  `windows-2022`, `windows-2025-vs2026` (= `windows-latest`), `windows-11-arm` and
+  `windows-11-vs2026-arm`.
+- **CMake releases.** The newest is 4.4.5 (2026-10-27), and 4.5.0-rc1 is out. The newest 3.21 is
+  3.21.7.
+- **`actions/checkout`.** v7.0.1 (commit `3d3c42e5…`) is still the newest release.
+
+[40583728552]: https://github.com/cpsusie/ct_string/actions/runs/40583728552
+[40584049573]: https://github.com/cpsusie/ct_string/actions/runs/40584049573
+[40584323698]: https://github.com/cpsusie/ct_string/actions/runs/40584323698
+
+## F-17 Linux toolchains, fmt and CMake for T6 (prototype, 2026-10-27)
+
+A throwaway prototype in Docker containers, with the repository mounted read-only. Builds use the
+T4 presets with `-Werror`. "Full build" means the C++20 checks, the C++23 suite and the demo.
+
+**`gcc:11.1`** (the official image, digest
+`sha256:02eaa5ab926f4dd4e4eeaec2ded6d24e3f3921b1797e4d48d0ad95e9b17f7d90`, built 2021-07-22):
+- Debian 11 (bullseye), glibc 2.31, GCC 11.1.0. It has `git` 2.30.2, `curl`, `unzip` and `make`,
+  but no CMake and no Ninja. The official Node 24.11.1 binary runs in it, so `actions/checkout`
+  can run there.
+- Pulling it took 16 s (449 MB compressed).
+- CMake from Kitware's release archive, checked against Kitware's SHA-256 file, works there, and
+  so does Ninja 1.13.2's release binary (`ninja-linux.zip`, SHA-256
+  `5749cbc4e668273514150a80e387a957f933c6ed3f5f11e03fb30955e2bbead6`).
+- `apt-get update` still works against bullseye, but `bullseye-backports` is already gone, and
+  bullseye's long-term support ended in August 2026: its packages may move to
+  `archive.debian.org`.
+- The C++20 checks build without fmt, and with every fmt from 5.3.0 to 12.0.0, including Debian's
+  `libfmt-dev` 7.1.3.
+
+**fmt: the real minimum is 8.0.**
+- The C++20 checks never format a view, so they pass with any fmt. A small program that formats
+  one fails with fmt 6.0.0 to 7.1.3: `ct_string_view.hpp:857` calls the base formatter's `format`
+  from a `const` member, and before fmt 8 that function is not `const` ("discards qualifiers").
+- fmt 8.0.1 and every later version tested format narrow and wide views.
+- fmt before 8 has no `<fmt/xchar.h>`, so the header silently leaves out wide formatting.
+
+**`ubuntu:22.04`:** `g++-11` 11.4.0, `g++-12` 12.3.0, CMake 3.22.1, `libfmt-dev` 8.1.1,
+`libgtest-dev` 1.11.0.
+- The C++20 checks build with GCC 11.4 and 12.3, with fmt and without it.
+- With GoogleTest installed, the suite builds there too, but runs 169 tests, not 176: its
+  libstdc++ has no `<format>`, so the seven `CtSvFormatter` tests are left out. The demo does not
+  build (`<format>` not found).
+
+**`ubuntu:24.04`:** `g++-13` 13.3.0, `g++-14` 14.2.0, Clang 16.0.6, 17.0.6 and 18.1.3, and
+`clang-19` 19.1.1 from the Ubuntu archive (`clang-20` 20.1.2 is there too); fmt 9.1.0, GoogleTest
+1.14.0. Every Clang uses GCC 14's libstdc++.
+
+| Build | Result |
+|---|---|
+| C++20 checks with fmt: GCC 13, GCC 14, Clang 17, 18, 19 | pass |
+| Full build, GCC 14 and Clang 19, Debug and Release | pass: 176 tests, demo exits with 0 |
+| Full build, GCC 13 | passes (D-008 does not promise it) |
+| Full build, Clang 18 | the demo fails (`std::expected` missing); the suite passes |
+| Suite, Clang 17 | fails in libstdc++'s `<tuple>`, from `tests/cstr_view_tests.cpp:1035` |
+| C++20 checks, Clang 16 | fails, as in F-2 |
+
+**`ubuntu:26.04`:** `g++-15` 15.2.0 (also 13.4 and 14.3), Clang 20.1.8, 21.1.8 and 22.1.2,
+CMake 4.2.3, `libfmt-dev` **10.1.1**, GoogleTest 1.17.0. Every Clang uses GCC 15's libstdc++.
+- GCC 15, full build, Debug and Release: 176 tests pass, and the demo exits with 0.
+- **Clang 20, 21 and 22 fail every build with Ubuntu's fmt 10.1.1**, inside fmt's own header:
+  `format-inl.h:61: error: call to consteval function … is not a constant expression`. A file that
+  only includes `<fmt/format.h>` fails the same way when `FMT_HEADER_ONLY` is defined, with no
+  warning flags; without `FMT_HEADER_ONLY` it compiles. The C++20 checks and the suite link
+  `fmt::fmt-header-only`, so they fail; the demo links the compiled `fmt::fmt`, and works.
+- In header-only mode, fmt 10.2.1 and 11.0.2 fail with Clang 20–22 too; fmt 11.1.4, 11.2.0 and
+  12.2.0 work. With fmt 12.2.0, the newest release (2026-06-16), built from its release archive,
+  Clang 20, 21 and 22 and GCC 15 pass the full build in Debug and Release, with no new warnings.
+
+**CMake** (`ubuntu:24.04`, GCC 14, full Debug build, archives from Kitware checked against their
+SHA-256 files): 3.21.0 (both presets, and the C++20 checks alone), 3.21.7, 4.4.5 (the newest,
+released 2026-10-27) and 4.5.0-rc1 all build the project and pass the 176 tests; the demo exits
+with 0. Ubuntu's own CMakes (3.22.1, 3.28.3 and 4.2.3) work with the presets too. CMake 4.4.5's
+summary line no longer says "0 tests failed", so nothing should look for that phrase.
+
+**arm64** could not be tried: this machine cannot run arm64 containers (no emulation).
+`ubuntu-24.04-arm` has the same compilers and CMake as `ubuntu-24.04` (F-16).
+
+**Sources:** the prototype's scripts and logs are kept with the Copilot session, not in the
+repository.
