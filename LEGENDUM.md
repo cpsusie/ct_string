@@ -1,5 +1,7 @@
 # cstr_view
 
+[![CI](https://github.com/cpsusie/ct_string/actions/workflows/ci.yml/badge.svg?branch=develop-release_1)](https://github.com/cpsusie/ct_string/actions/workflows/ci.yml?query=branch%3Adevelop-release_1)
+
 Bibliotheca parva C++20, quae solis capitibus constat, duo genera inter se coniuncta, ex `std::basic_string_view` ducta, praebet:
 
 | Genus | Caput | Quid sit |
@@ -948,6 +950,7 @@ Ad hanc distinctionem servandam, apparatus aedificationis bibliothecam staticam 
 - In Linux/x86_64 verificatum cum **GCC 13**, GCC 14, Clang 19; bibliotheca C++20, probationes C++23.
 - GCC 13 terminus inferior consulto est: eius libstdc++ `std::ranges::to` (P1206R7) nondum habet; quare neque bibliotheca neque probationes eo niti possunt.
 - Cum `fmtlib` et sine eo probatum.
+- CI quidquid in ramos `develop-release_1` et `main` impellitur (`push`), et quamque petitionem coniungendi (`pull request`) in eos factam, in Linux/x86_64 cum GCC 14 probat: probationes C++20, cum fmt et sine eo; probationes C++23 et programma demonstrativum, utroque modo, `Debug` et `Release`.
 - CMake 3.21 vel posterius, si apparatu CMake uteris; ad capita manu includenda CMake non requiritur.
 - Praeter libstdc++ et bibliothecam STL MSVC, etiam **libc++ 17** et versiones posteriores adhiberi possunt. Hoc in instrumento locali Linux/x86_64 verificatum est, cum Clang 17 + libc++ 17 et cum Clang 20 + libc++ 20; cum posteriore etiam probationes C++23 succedunt. CI libc++ nondum probat.
 - `std::formatter`, si adhibetur, `<format>` requirit atque `__cpp_lib_format >= 201907L`. libc++ hanc macrodefinitionem a versione 19 demum definit; cum libc++ 17 et 18 igitur specialitas `std::formatter` huius bibliothecae omittitur.

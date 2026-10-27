@@ -1,5 +1,7 @@
 # cstr_view
 
+[![CI](https://github.com/cpsusie/ct_string/actions/workflows/ci.yml/badge.svg?branch=develop-release_1)](https://github.com/cpsusie/ct_string/actions/workflows/ci.yml?query=branch%3Adevelop-release_1)
+
 A small, header-only C++20 library providing two complementary types built on
 `std::basic_string_view`:
 
@@ -1165,6 +1167,9 @@ downstream users on older toolchains.
   predates `std::ranges::to` (P1206R7), so nothing in the library -- or in the
   tests -- may depend on it.
 - Tested with and without `fmtlib`.
+- CI tests every push to, and every pull request into, `develop-release_1`
+  and `main` on Linux/x86_64 with GCC 14: the C++20 checks, with fmt and
+  without it; and the C++23 tests and the demo, in Debug and Release builds.
 - CMake 3.21 or later, to use the CMake project. Including the headers manually
   needs no CMake.
 - Besides libstdc++ and the MSVC STL, **libc++ 17 or later** works. This was
